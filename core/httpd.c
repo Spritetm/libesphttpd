@@ -230,8 +230,10 @@ int ICACHE_FLASH_ATTR cgiRedirect(HttpdConnData *connData) {
 
 //This CGI function redirects to a fixed url of http://[hostname]/ if hostname field of request isn't
 //already that hostname. Use this in combination with a DNS server that redirects everything to the
-//ESP in order to load a HTML page as soon as a phone connects to the ESP.
-int ICACHE_FLASH_ATTR cgiCheckHostname(HttpdConnData *connData) {
+//ESP in order to load a HTML page as soon as a phone, tablet etc connects to the ESP. Watch out:
+//this will also redirect connections when the ESP is in STA mode, potentially to a hostname that is not
+//in the 'official' DNS and so will fail.
+int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
 	char buff[1024];
 	if (connData->conn==NULL) {
 		//Connection aborted. Clean up.
@@ -245,6 +247,26 @@ int ICACHE_FLASH_ATTR cgiCheckHostname(HttpdConnData *connData) {
 	httpdRedirect(connData, buff);
 	return HTTPD_CGI_DONE;
 }
+
+
+//Same as above, but will only redirect clients with an IP that is in the range of
+//the SoftAP interface. This should preclude clients connected to the STA interface
+//to be redirected to nowhere.
+int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
+	uint32 *remadr;
+	struct ip_info apip;
+	int x=wifi_get_opmode();
+	//Check if we have an softap interface; bail out if not
+	if (x!=2 && x!=3) return HTTPD_CGI_NOTFOUND;
+	remadr=(uint32 *)connData->conn->proto.tcp->remote_ip;
+	wifi_get_ip_info(SOFTAP_IF, &apip);
+	if ((*remadr & apip.netmask.addr) == (apip.ip.addr & apip.netmask.addr)) {
+		return cgiRedirectToHostname(connData);
+	} else {
+		return HTTPD_CGI_NOTFOUND;
+	}
+}
+
 
 //Add data to the send buffer. len is the length of the data. If len is -1
 //the data is seen as a C-string.
