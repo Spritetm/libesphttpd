@@ -102,7 +102,7 @@ lib/heatshrink/Makefile:
 	$(Q) git submodule update
 
 
-$(LIB): submodules $(OBJ)
+$(LIB): $(BUILD_DIR) submodules $(OBJ)
 	$(vecho) "AR $@"
 	$(Q) $(AR) cru $@ $(OBJ)
 
