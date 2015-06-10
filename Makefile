@@ -91,14 +91,20 @@ $1/%.o: %.c
 	$(Q) $(CC) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CFLAGS)  -c $$< -o $$@
 endef
 
-.PHONY: all checkdirs clean webpages.espfs
+.PHONY: all checkdirs clean webpages.espfs submodules
 
 all: checkdirs $(LIB) webpages.espfs libwebpages-espfs.a
 
+submodules: lib/heatshrink/Makefile
+lib/heatshrink/Makefile:
+	$(Q) echo "Heatshrink isn't found. Checking out submodules to fetch it."
+	$(Q) git submodule init
+	$(Q) git submodule update
 
-$(LIB): $(OBJ)
+
+$(LIB): submodules $(OBJ)
 	$(vecho) "AR $@"
-	$(Q) $(AR) cru $@ $^
+	$(Q) $(AR) cru $@ $(OBJ)
 
 checkdirs: $(BUILD_DIR)
 
