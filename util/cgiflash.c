@@ -20,23 +20,37 @@ Some flash handling cgi routines. Used for reading the existing flash and updati
 //Cgi that reads the SPI flash. Assumes 512KByte flash.
 int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 	int *pos=(int *)&connData->cgiData;
+	char temp[10];
+	int len;
+	int offset = 0;
+	int length = 512*1024;
+
 	if (connData->conn==NULL) {
 		//Connection aborted. Clean up.
 		return HTTPD_CGI_DONE;
 	}
+
+	if(httpdFindArg(connData->getArgs, "offset", temp, sizeof(temp)) > 0){
+		offset = atoi(temp);
+	}
+	if(httpdFindArg(connData->getArgs, "length", temp, sizeof(temp)) > 0){
+		length = atoi(temp);
+	}
+	os_printf("Offset: %d Length: %d\n", offset, length);
 
 	if (*pos==0) {
 		os_printf("Start flash download.\n");
 		httpdStartResponse(connData, 200);
 		httpdHeader(connData, "Content-Type", "application/bin");
 		httpdEndHeaders(connData);
-		*pos=0x40200000;
+		*pos=0x40200000 + offset;
 		return HTTPD_CGI_MORE;
 	}
 	//Send 1K of flash per call. We will get called again if we haven't sent 512K yet.
-	espconn_sent(connData->conn, (uint8 *)(*pos), 1024);
+	int remaining = 0x40200000+offset+length - *pos;
+	espconn_sent(connData->conn, (uint8 *)(*pos), remaining > 1024 ? 1024 : remaining);
 	*pos+=1024;
-	if (*pos>=0x40200000+(512*1024)) return HTTPD_CGI_DONE; else return HTTPD_CGI_MORE;
+	if (*pos>=0x40200000+offset+length) return HTTPD_CGI_DONE; else return HTTPD_CGI_MORE;
 }
 
 
