@@ -87,7 +87,7 @@ int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 
 //Cgi that allows the firmware to be replaced via http POST
 int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
-	CgiUploadFlashDef *def=(CgiUploadFlashDef*)connData->cgiData;
+	CgiUploadFlashDef *def=(CgiUploadFlashDef*)connData->cgiArg;
 	uint32_t address;
 	if (connData->conn==NULL) {
 		//Connection aborted. Clean up.
@@ -106,8 +106,12 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 	char *err = NULL;
 	int code = 400;
 
+	if (connData->post==NULL) err="No POST request.";
+	if (def==NULL) err="Flash def = NULL ?";
+
 	// check overall size
-	if (connData->post->len > def->fwSize) err = "Firmware image too large";
+	os_printf("Max img sz 0x%X, post len 0x%X\n", def->fwSize, connData->post->len);
+	if (err==NULL && connData->post->len > def->fwSize) err = "Firmware image too large";
 
 	// check that data starts with an appropriate header
 	if (err == NULL && offset == 0 && def->type==CGIFLASH_TYPE_FW) err = checkBinHeader(connData->post->buff);
@@ -125,7 +129,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 		httpdStartResponse(connData, code);
 		httpdHeader(connData, "Content-Type", "text/plain");
 		httpdEndHeaders(connData);
-		httpdSend(connData, "Firmware image error:.\r\n", -1);
+		httpdSend(connData, "Firmware image error:\r\n", -1);
 		httpdSend(connData, err, -1);
 		httpdSend(connData, "\r\n", -1);
 		connData->cgiPrivData = (void *)1;
