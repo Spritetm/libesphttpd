@@ -231,7 +231,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			setn16(&rf->rdlength, 4+16);
 			setn16(&uh->prio, 10);
 			setn16(&uh->weight, 1);
-			memcpy(rend, "http://esp.local", 16);
+			memcpy(rend, "http://esp.nonet", 16);
 			rend+=16;
 			setn16(&rhdr->ancount, ntohs(&rhdr->ancount)+1);
 //			os_printf("Added NS rec to resp. Resp len is %d\n", (rend-reply));
