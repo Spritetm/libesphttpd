@@ -192,7 +192,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			rend+=sizeof(DnsResourceFooter);
 			setn16(&rf->type, QTYPE_A);
 			setn16(&rf->class, QCLASS_IN);
-			setn32(&rf->ttl, 1);
+			setn32(&rf->ttl, 0);
 			setn16(&rf->rdlength, 4); //IPv4 addr is 4 bytes;
 			//Grab the current IP of the softap interface
 			struct ip_info info;
@@ -210,7 +210,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			rend+=sizeof(DnsResourceFooter);
 			setn16(&rf->type, QTYPE_NS);
 			setn16(&rf->class, QCLASS_IN);
-			setn16(&rf->ttl, 1);
+			setn16(&rf->ttl, 0);
 			setn16(&rf->rdlength, 4);
 			*rend++=2;
 			*rend++='n';
@@ -227,7 +227,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			rend+=sizeof(DnsUriHdr);
 			setn16(&rf->type, QTYPE_URI);
 			setn16(&rf->class, QCLASS_URI);
-			setn16(&rf->ttl, 1);
+			setn16(&rf->ttl, 0);
 			setn16(&rf->rdlength, 4+16);
 			setn16(&uh->prio, 10);
 			setn16(&uh->weight, 1);
