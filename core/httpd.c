@@ -594,4 +594,5 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 	os_printf("Httpd init, conn=%p\n", &httpdConn);
 	espconn_regist_connectcb(&httpdConn, httpdConnectCb);
 	espconn_accept(&httpdConn);
+	espconn_tcp_set_max_con_allow(&httpdConn, MAX_CONN);
 }
