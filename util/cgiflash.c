@@ -28,7 +28,7 @@ Some flash handling cgi routines. Used for reading the existing flash and updati
 
 
 // Check that the header of the firmware blob looks like actual firmware...
-static char* ICACHE_FLASH_ATTR check_header(void *buf) {
+static char* ICACHE_FLASH_ATTR checkBinHeader(void *buf) {
 	uint8_t *cd = (uint8_t *)buf;
 	if (cd[0] != 0xEA) return "IROM magic missing";
 	if (cd[1] != 4 || cd[2] > 3 || cd[3] > 0x40) return "bad flash header";
@@ -36,7 +36,11 @@ static char* ICACHE_FLASH_ATTR check_header(void *buf) {
 	if (((uint32_t *)buf)[2] != 0) return "Invalid start offset";
 	return NULL;
 }
- 
+
+static char* ICACHE_FLASH_ATTR checkEspfsHeader(void *buf) {
+	if (os_memcmp(buf, "ESfs", 4)!=0) return "Bad ESPfs header";
+	return NULL;
+}
 
 
 // Cgi to query which firmware needs to be uploaded next
@@ -45,9 +49,6 @@ int ICACHE_FLASH_ATTR cgiGetFirmwareNext(HttpdConnData *connData) {
 		//Connection aborted. Clean up.
 		return HTTPD_CGI_DONE;
 	}
-	/* TODO: fix this check so it calculates the end of the irom segment minus the start of the espfs */
-//	if(connData->post->len > ESPFS_SIZE){
-
 	uint8 id = system_upgrade_userbin_check();
 	httpdStartResponse(connData, 200);
 	httpdHeader(connData, "Content-Type", "text/plain");
@@ -61,6 +62,7 @@ int ICACHE_FLASH_ATTR cgiGetFirmwareNext(HttpdConnData *connData) {
 
 
 //Cgi that reads the SPI flash. Assumes 512KByte flash.
+//ToDo: Figure out real flash size somehow?
 int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 	int *pos=(int *)&connData->cgiData;
 	if (connData->conn==NULL) {
@@ -85,6 +87,8 @@ int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 
 //Cgi that allows the firmware to be replaced via http POST
 int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
+	CgiUploadFlashDef *def=(CgiUploadFlashDef*)connData->cgiData;
+	uint32_t address;
 	if (connData->conn==NULL) {
 		//Connection aborted. Clean up.
 		return HTTPD_CGI_DONE;
@@ -103,10 +107,11 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 	int code = 400;
 
 	// check overall size
-	if (connData->post->len > FIRMWARE_SIZE) err = "Firmware image too large";
+	if (connData->post->len > def->fwSize) err = "Firmware image too large";
 
 	// check that data starts with an appropriate header
-	if (err == NULL && offset == 0) err = check_header(connData->post->buff);
+	if (err == NULL && offset == 0 && def->type==CGIFLASH_TYPE_FW) err = checkBinHeader(connData->post->buff);
+	if (err == NULL && offset == 0 && def->type==CGIFLASH_TYPE_ESPFS) err = checkEspfsHeader(connData->post->buff);
 
 	// make sure we're buffering in 1024 byte chunks
 	if (err == NULL && offset % 1024 != 0) {
@@ -119,9 +124,8 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 		os_printf("Error %d: %s\n", code, err);
 		httpdStartResponse(connData, code);
 		httpdHeader(connData, "Content-Type", "text/plain");
-		//httpdHeader(connData, "Content-Length", strlen(err)+2);
 		httpdEndHeaders(connData);
-		httpdSend(connData, "Firmware image loo large.\r\n", -1);
+		httpdSend(connData, "Firmware image error:.\r\n", -1);
 		httpdSend(connData, err, -1);
 		httpdSend(connData, "\r\n", -1);
 		connData->cgiPrivData = (void *)1;
@@ -129,19 +133,18 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 	}
 
 	// let's see which partition we need to flash and what flash address that puts us at
-	uint8 id = system_upgrade_userbin_check();
-	int address = id == 1 ? 4*1024                   // either start after 4KB boot partition
-	    : 4*1024 + FIRMWARE_SIZE + 16*1024 + 4*1024; // 4KB boot, fw1, 16KB user param, 4KB reserved
+	int id=system_upgrade_userbin_check();
+	if (id==1) address=def->fw1Pos; else address=def->fw2Pos;
 	address += offset;
 	// erase next flash block if necessary
 	if (address % SPI_FLASH_SEC_SIZE == 0){
 		// We need to erase this block
-		os_printf("Erasing flash at 0x%05x (id=%d)\n", address, 2-id);
+		os_printf("Erasing flash at 0x%05x (id=%d)\n", (unsigned int)address, 2-id);
 		spi_flash_erase_sector(address/SPI_FLASH_SEC_SIZE);
 	}
 
 	// Write the data
-	os_printf("Writing %d bytes at 0x%05x (%d of %d)\n", connData->post->buffSize, address,
+	os_printf("Writing %d bytes at 0x%05x (%d of %d)\n", connData->post->buffSize, (unsigned int)address,
 			connData->post->received, connData->post->len);
 	spi_flash_write(address, (uint32 *)connData->post->buff, connData->post->buffLen);
 
@@ -166,7 +169,7 @@ int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {
 	// TODO: sanity-check that the 'next' partition actually contains something that looks like
 	// valid firmware
 
-	// This hsould probably be forked into a separate task that waits a second to let the
+	// This should probably be forked into a separate task that waits a second to let the
 	// current HTTP request finish...
 	system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
 	system_upgrade_reboot();
