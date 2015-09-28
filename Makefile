@@ -11,7 +11,7 @@ GZIP_COMPRESSION ?= no
 COMPRESS_W_YUI ?= no
 YUI-COMPRESSOR ?= /usr/bin/yui-compressor
 USE_HEATSHRINK ?= yes
-
+HTTPD_WEBSOCKETS ?= yes
 
 
 # Output directors to store intermediate compiled files
@@ -81,6 +81,10 @@ endif
 
 ifeq ("$(USE_HEATSHRINK)","yes")
 CFLAGS		+= -DESPFS_HEATSHRINK
+endif
+
+ifeq ("$(HTTPD_WEBSOCKETS)","yes")
+CFLAGS		+= -DHTTPD_WEBSOCKETS
 endif
 
 vpath %.c $(SRC_DIR)
