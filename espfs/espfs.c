@@ -85,7 +85,7 @@ EspFsInitResult ICACHE_FLASH_ATTR espFsInit(void *flashAddress) {
 
 	// check if there is valid header at address
 	EspFsHeader testHeader;
-	spi_flash_read((uint32_t)flashAddress, (uint32_t*)&testHeader, sizeof(EspFsHeader));
+	spi_flash_read((uint32)flashAddress, (uint32*)&testHeader, sizeof(EspFsHeader));
 	if (testHeader.magic != ESPFS_MAGIC) {
 		return ESPFS_INIT_RESULT_NO_IMAGE;
 	}
@@ -104,7 +104,7 @@ void ICACHE_FLASH_ATTR readFlashUnaligned(char *dst, char *src, int len) {
 	uint32_t src_address = ((uint32_t)src) - src_offset;
 
 	uint32_t tmp_buf[len/4 + 2];
-	spi_flash_read(src_address, tmp_buf, len+src_offset);
+	spi_flash_read((uint32)src_address, (uint32*)tmp_buf, len+src_offset);
 	os_memcpy(dst, ((uint8_t*)tmp_buf)+src_offset, len);
 }
 #else
@@ -140,7 +140,7 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 	while(1) {
 		hpos=p;
 		//Grab the next file header.
-		spi_flash_read((uint32_t)p, (uint32_t*)&h, sizeof(EspFsHeader));
+		spi_flash_read((uint32)p, (uint32*)&h, sizeof(EspFsHeader));
 
 		if (h.magic!=ESPFS_MAGIC) {
 			os_printf("Magic mismatch. EspFS image broken.\n");
@@ -152,7 +152,7 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 		}
 		//Grab the name of the file.
 		p+=sizeof(EspFsHeader); 
-		spi_flash_read((uint32_t)p, (uint32_t*)&namebuf, sizeof(namebuf));
+		spi_flash_read((uint32)p, (uint32*)&namebuf, sizeof(namebuf));
 //		os_printf("Found file '%s'. Namelen=%x fileLenComp=%x, compr=%d flags=%d\n", 
 //				namebuf, (unsigned int)h.nameLen, (unsigned int)h.fileLenComp, h.compression, h.flags);
 		if (os_strcmp(namebuf, fileName)==0) {
