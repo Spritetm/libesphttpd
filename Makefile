@@ -120,7 +120,7 @@ ifeq ("$(COMPRESS_W_YUI)","yes")
 	$(Q) for file in `find html_compressed -type f -name "*.js"`; do $(YUI-COMPRESSOR) --type js $$file -o $$file; done
 	$(Q) for file in `find html_compressed -type f -name "*.css"`; do $(YUI-COMPRESSOR) --type css $$file -o $$file; done
 	$(Q) awk "BEGIN {printf \"YUI compression ratio was: %.2f%%\\n\", (`du -b -s html_compressed/ | sed 's/\([0-9]*\).*/\1/'`/`du -b -s ../html/ | sed 's/\([0-9]*\).*/\1/'`)*100}"
-# mkespfsimage will compress html, css and js files with gzip by default if enabled
+# mkespfsimage will compress html, css, svg and js files with gzip by default if enabled
 # override with -g cmdline parameter
 	$(Q) cd html_compressed; find . | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..;
 else

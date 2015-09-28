@@ -309,7 +309,7 @@ int main(int argc, char **argv) {
 
 #ifdef ESPFS_GZIP
 	if (gzipExtensions == NULL) {
-		parseGzipExtensions(strdup("html,css,js"));
+		parseGzipExtensions(strdup("html,css,js,svg"));
 	}
 #endif
 
