@@ -25,7 +25,6 @@ Esp8266 http server - core routines
 //Max send buffer len
 #define MAX_SENDBUFF_LEN 2048
 
-
 //This gets set at init time.
 static HttpdBuiltInUrl *builtInUrls;
 
@@ -404,21 +403,21 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 //Parse a line of header data and modify the connection data accordingly.
 static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 	int i;
-	char first_line = false;
+	char firstLine=0;
 	
 	if (os_strncmp(h, "GET ", 4)==0) {
 		conn->requestType = HTTPD_METHOD_GET;
-		first_line = true;
+		firstLine=1;
 	} else if (os_strncmp(h, "Host:", 5)==0) {
 		i=5;
 		while (h[i]==' ') i++;
 		conn->hostName=&h[i];
 	} else if (os_strncmp(h, "POST ", 5)==0) {
 		conn->requestType = HTTPD_METHOD_POST;
-		first_line = true;
+		firstLine=1;
 	}
 
-	if (first_line) {
+	if (firstLine) {
 		char *e;
 		
 		//Skip past the space after POST/GET
@@ -526,6 +525,12 @@ static void ICACHE_FLASH_ATTR httpdRecvCb(void *arg, char *data, unsigned short 
 				//Send the response.
 				httpdProcessRequest(conn);
 				conn->post->buffLen = 0;
+			}
+		} else {
+			//Let cgi handle data if it registered a recvHdl callback. If not, ignore.
+			if (conn->recvHdl) {
+				conn->recvHdl(conn, data+x, len-x);
+				break;
 			}
 		}
 	}

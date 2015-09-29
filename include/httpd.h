@@ -11,12 +11,12 @@
 #define HTTPD_METHOD_GET 1
 #define HTTPD_METHOD_POST 2
 
-
 typedef struct HttpdPriv HttpdPriv;
 typedef struct HttpdConnData HttpdConnData;
 typedef struct HttpdPostData HttpdPostData;
 
 typedef int (* cgiSendCallback)(HttpdConnData *connData);
+typedef int (* cgiRecvHandler)(HttpdConnData *connData, char *data, int len);
 
 //A struct describing a http connection. This gets passed to cgi functions.
 struct HttpdConnData {
@@ -30,6 +30,7 @@ struct HttpdConnData {
 	char *hostName;
 	HttpdPriv *priv;
 	cgiSendCallback cgi;
+	cgiRecvHandler recvHdl;
 	HttpdPostData *post;
 	int remote_port;
 	uint8 remote_ip[4];
