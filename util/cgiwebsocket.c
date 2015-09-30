@@ -1,3 +1,17 @@
+/*
+Websocket support for esphttpd. Inspired by https://github.com/dangrie158/ESP-8266-WebSocket
+*/
+
+/*
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 42):
+ * Jeroen Domburg <jeroen@spritesmods.com> wrote this file. As long as you retain 
+ * this notice you can do whatever you want with this stuff. If we meet some day, 
+ * and you think this stuff is worth it, you can buy me a beer in return. 
+ * ----------------------------------------------------------------------------
+ */
+
+
 #include <esp8266.h>
 #include "httpd.h"
 #include "sha1.h"
