@@ -67,8 +67,10 @@ struct WebsockPriv {
 	uint8 frameCont;
 	uint8 mustClose;
 	int wsStatus;
+	Websock *next; //in linked list
 };
 
+static Websock *llStart=NULL;
 
 static int ICACHE_FLASH_ATTR sendFrameHead(Websock *ws, int opcode, int len) {
 	char buf[14];
@@ -101,6 +103,21 @@ int ICACHE_FLASH_ATTR cgiWebsocketSend(Websock *ws, char *data, int len, int fla
 	httpdFlushSendBuffer(ws->conn);
 	return r;
 }
+
+//Broadcast data to all websockets at a specific url. Returns the amount of connections sent to.
+int ICACHE_FLASH_ATTR cgiWebsockBroadcast(char *resource, char *data, int len, int flags) {
+	Websock *lw=llStart;
+	int ret=0;
+	while (lw!=NULL) {
+		if (os_strcmp(lw->conn->url, resource)==0) {
+			cgiWebsocketSend(lw, data, len, flags);
+			ret++;
+		}
+		lw=lw->priv->next;
+	}
+	return ret;
+}
+
 
 void ICACHE_FLASH_ATTR cgiWebsocketClose(Websock *ws) {
 	sendFrameHead(ws, FLAG_FIN|OPCODE_CLOSE, 0);
@@ -185,6 +202,15 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 		if (connData->cgiPrivData) {
 			Websock *ws=(Websock*)connData->cgiPrivData;
 			if (ws->closeCb) ws->closeCb(ws);
+			//Clean up linked list
+			if (llStart==ws) {
+				llStart=ws->priv->next;
+			} else if (llStart) {
+				Websock *lws=llStart;
+				//Find ws that links to this one.
+				while (lws!=NULL && lws->priv->next!=ws) lws=lws->priv->next;
+				if (lws!=NULL) lws->priv->next=ws->priv->next;
+			}
 			if (ws->priv) os_free(ws->priv);
 			os_free(connData->cgiPrivData);
 			connData->cgiPrivData=NULL;
@@ -224,6 +250,14 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 				//Inform CGI function we have a connection
 				WsConnectedCb connCb=connData->cgiArg;
 				connCb(ws);
+				//Insert ws into linked list
+				if (llStart==NULL) {
+					llStart=ws;
+				} else {
+					Websock *lw=llStart;
+					while (lw->priv->next) lw=lw->priv->next;
+					lw->priv->next=ws;
+				}
 				return HTTPD_CGI_MORE;
 			}
 		}
