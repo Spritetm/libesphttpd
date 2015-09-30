@@ -301,8 +301,9 @@ int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) 
 	return 1;
 }
 
-//Helper function to send any data in conn->priv->sendBuff
-static void ICACHE_FLASH_ATTR xmitSendBuff(HttpdConnData *conn) {
+//Function to send any data in conn->priv->sendBuff. Do not use in CGIs unless you know what you
+//are doing!
+void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
 	if (conn->priv->sendBuffLen!=0) {
 		espconn_sent(conn->conn, (uint8_t*)conn->priv->sendBuff, conn->priv->sendBuffLen);
 		conn->priv->sendBuffLen=0;
@@ -324,7 +325,7 @@ static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
 		os_printf("Conn %p is done. Closing.\n", conn->conn);
 		espconn_disconnect(conn->conn);
 		httpdRetireConn(conn);
-		return; //No need to call xmitSendBuff.
+		return; //No need to call httpdFlushSendBuffer.
 	}
 
 	r=conn->cgi(conn); //Execute cgi fn.
@@ -335,7 +336,7 @@ static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
 		os_printf("ERROR! CGI fn returns code %d after sending data! Bad CGI!\n", r);
 		conn->cgi=NULL; //mark for destruction.
 	}
-	xmitSendBuff(conn);
+	httpdFlushSendBuffer(conn);
 }
 
 static const char *httpNotFoundHeader="HTTP/1.0 404 Not Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nNot Found.\r\n";
@@ -375,7 +376,7 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 			//generate a built-in 404 to handle this.
 			os_printf("%s not found. 404!\n", conn->url);
 			httpdSend(conn, httpNotFoundHeader, -1);
-			xmitSendBuff(conn);
+			httpdFlushSendBuffer(conn);
 			conn->cgi=NULL; //mark for destruction
 			return;
 		}
@@ -385,11 +386,11 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 		r=conn->cgi(conn);
 		if (r==HTTPD_CGI_MORE) {
 			//Yep, it's happy to do so and has more data to send.
-			xmitSendBuff(conn);
+			httpdFlushSendBuffer(conn);
 			return;
 		} else if (r==HTTPD_CGI_DONE) {
 			//Yep, it's happy to do so and already is done sending data.
-			xmitSendBuff(conn);
+			httpdFlushSendBuffer(conn);
 			conn->cgi=NULL; //mark conn for destruction
 			return;
 		} else if (r==HTTPD_CGI_NOTFOUND || r==HTTPD_CGI_AUTHENTICATED) {
