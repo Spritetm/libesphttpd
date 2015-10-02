@@ -5,7 +5,9 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef USE_MMAP
 #include <sys/mman.h>
+#endif
 #include <arpa/inet.h>
 #include <string.h>
 #include "espfs.h"
@@ -182,11 +184,17 @@ int handleFile(int f, char *name, int compression, int level, char **compName) {
 	int nameLen;
 	int8_t flags = 0;
 	size=lseek(f, 0, SEEK_END);
+#ifdef USE_MMAP
 	fdat=mmap(NULL, size, PROT_READ, MAP_SHARED, f, 0);
 	if (fdat==MAP_FAILED) {
 		perror("mmap");
 		return 0;
 	}
+#else
+	fdat = malloc(size);
+	lseek(f, 0, SEEK_SET);
+	read(f, fdat, size);
+#endif
 
 #ifdef ESPFS_GZIP
 	if (shouldCompressGzip(name)) {
@@ -242,7 +250,11 @@ int handleFile(int f, char *name, int compression, int level, char **compName) {
 		write(1, "\000", 1);
 		csize++;
 	}
+#ifdef USE_MMAP
 	munmap(fdat, size);
+#else
+	free(fdat);
+#endif
 
 	if (compName != NULL) {
 		if (h.compression==COMPRESS_HEATSHRINK) {
