@@ -205,6 +205,20 @@ int ICACHE_FLASH_ATTR cgiWebSocketRecv(HttpdConnData *connData, char *data, int 
 	return 0;
 }
 
+static void ICACHE_FLASH_ATTR websockFree(Websock *ws) {
+	if (ws->closeCb) ws->closeCb(ws);
+	//Clean up linked list
+	if (llStart==ws) {
+		llStart=ws->priv->next;
+	} else if (llStart) {
+		Websock *lws=llStart;
+		//Find ws that links to this one.
+		while (lws!=NULL && lws->priv->next!=ws) lws=lws->priv->next;
+		if (lws!=NULL) lws->priv->next=ws->priv->next;
+	}
+	if (ws->priv) os_free(ws->priv);
+}
+
 //Websocket 'cgi' implementation
 int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 	char buff[256];
@@ -215,17 +229,7 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 //		os_printf("WS: Cleanup\n");
 		if (connData->cgiPrivData) {
 			Websock *ws=(Websock*)connData->cgiPrivData;
-			if (ws->closeCb) ws->closeCb(ws);
-			//Clean up linked list
-			if (llStart==ws) {
-				llStart=ws->priv->next;
-			} else if (llStart) {
-				Websock *lws=llStart;
-				//Find ws that links to this one.
-				while (lws!=NULL && lws->priv->next!=ws) lws=lws->priv->next;
-				if (lws!=NULL) lws->priv->next=ws->priv->next;
-			}
-			if (ws->priv) os_free(ws->priv);
+			websockFree(ws);
 			os_free(connData->cgiPrivData);
 			connData->cgiPrivData=NULL;
 		}
@@ -285,8 +289,13 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 	Websock *ws=(Websock*)connData->cgiPrivData;
 	if (ws && ws->sentCb) ws->sentCb(ws);
 	
-	if (ws && ws->priv->mustClose) return HTTPD_CGI_DONE;
-	
+	if (ws && ws->priv->mustClose) {
+		websockFree(ws);
+		os_free(connData->cgiPrivData);
+		connData->cgiPrivData=NULL;
+		return HTTPD_CGI_DONE;
+	}
+
 	return HTTPD_CGI_MORE;
 }
 
