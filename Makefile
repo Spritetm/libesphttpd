@@ -37,8 +37,14 @@ EXTRA_INCDIR	= ./include \
 
 # compiler flags using during compilation of source files
 CFLAGS		= -Os -ggdb -std=c99 -Werror -Wpointer-arith -Wundef -Wall -Wl,-EL -fno-inline-functions \
-		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH -D_STDINT_H \
+		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH \
 		-Wno-address
+
+ifeq ($(USE_OPENSDK),1)
+CFLAGS		+= -DUSE_OPENSDK
+else
+CFLAGS		+= -D_STDINT_H
+endif
 
 # various paths from the SDK used in this project
 SDK_LIBDIR	= lib
