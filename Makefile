@@ -76,7 +76,7 @@ vecho := @echo
 endif
 
 
-ifeq ($(USE_OPENSDK),"yes")
+ifeq ("$(USE_OPENSDK)","yes")
 CFLAGS		+= -DUSE_OPENSDK
 else
 CFLAGS		+= -D_STDINT_H
