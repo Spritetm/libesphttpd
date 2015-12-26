@@ -148,7 +148,7 @@ int ICACHE_FLASH_ATTR  httpdUrlDecode(char *val, int valLen, char *ret, int retL
 //returned string will be urldecoded already.
 int ICACHE_FLASH_ATTR httpdFindArg(char *line, char *arg, char *buff, int buffLen) {
 	char *p, *e;
-	if (line==NULL) return 0;
+	if (line==NULL) return -1;
 	p=line;
 	while(p!=NULL && *p!='\n' && *p!='\r' && *p!=0) {
 		os_printf("findArg: %s\n", p);
