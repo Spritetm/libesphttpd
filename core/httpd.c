@@ -90,7 +90,7 @@ static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(void *arg) {
 		}
 	}
 	//Shouldn't happen.
-	os_printf("*** Unknown connection 0x%p\n", arg);
+	os_printf("*** Unknown connection " IPSTR ":%d\n", IP2STR(&espconn->proto.tcp->remote_ip), espconn->proto.tcp->remote_port);
 	return NULL;
 }
 
@@ -322,7 +322,7 @@ static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
 	conn->priv->sendBuffLen=0;
 
 	if (conn->cgi==NULL) { //Marked for destruction?
-		os_printf("Conn %p is done. Closing.\n", conn->conn);
+		os_printf("Pool slot %d is done. Closing.\n", conn->slot);
 		espconn_disconnect(conn->conn);
 		return; //No need to call httpdFlushSendBuffer.
 	}
@@ -557,7 +557,7 @@ static void ICACHE_FLASH_ATTR httpdConnectCb(void *arg) {
 	int i;
 	//Find empty conndata in pool
 	for (i=0; i<MAX_CONN; i++) if (connData[i].conn==NULL) break;
-	os_printf("Con req, conn=%p, pool slot %d\n", conn, i);
+	os_printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(&conn->proto.tcp->remote_ip), conn->proto.tcp->remote_port, i);
 	if (i==MAX_CONN) {
 		os_printf("Aiee, conn pool overflow!\n");
 		espconn_disconnect(conn);
@@ -587,6 +587,7 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 
 	for (i=0; i<MAX_CONN; i++) {
 		connData[i].conn=NULL;
+		connData[i].slot=i;
 	}
 	httpdConn.type=ESPCONN_TCP;
 	httpdConn.state=ESPCONN_NONE;
@@ -594,7 +595,7 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 	httpdConn.proto.tcp=&httpdTcp;
 	builtInUrls=fixedUrls;
 
-	os_printf("Httpd init, conn=%p\n", &httpdConn);
+	os_printf("Httpd init\n");
 	espconn_regist_connectcb(&httpdConn, httpdConnectCb);
 	espconn_accept(&httpdConn);
 	espconn_tcp_set_max_con_allow(&httpdConn, MAX_CONN);
