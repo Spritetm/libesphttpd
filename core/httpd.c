@@ -85,7 +85,7 @@ static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(void *arg) {
 	for (int i=0; i<MAX_CONN; i++) {
 		if (connData[i].remote_port == espconn->proto.tcp->remote_port &&
 						os_memcmp(connData[i].remote_ip, espconn->proto.tcp->remote_ip, 4) == 0) {
-			if (arg != connData[i].conn) connData[i].conn = arg; // yes, this happens!?
+			connData[i].conn=espconn;
 			return &connData[i];
 		}
 	}
@@ -280,7 +280,7 @@ int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
 	int x=wifi_get_opmode();
 	//Check if we have an softap interface; bail out if not
 	if (x!=2 && x!=3) return HTTPD_CGI_NOTFOUND;
-	remadr=(uint32 *)connData->conn->proto.tcp->remote_ip;
+	remadr=(uint32 *)connData->remote_ip;
 	wifi_get_ip_info(SOFTAP_IF, &apip);
 	if ((*remadr & apip.netmask.addr) == (apip.ip.addr & apip.netmask.addr)) {
 		return cgiRedirectToHostname(connData);
