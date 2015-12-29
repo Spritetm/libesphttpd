@@ -140,10 +140,8 @@ endif
 
 libwebpages-espfs.a: webpages.espfs
 	$(Q) $(OBJCOPY) -I binary -O elf32-xtensa-le -B xtensa --rename-section .data=.irom0.literal \
-		--redefine-sym _binary_webpages_espfs_start=webpages_espfs_start \
-		--redefine-sym _binary_webpages_espfs_end=webpages_espfs_end \
-		--redefine-sym _binary_webpages_espfs_size=webpages_espfs_size \
-		webpages.espfs build/webpages.espfs.o
+		webpages.espfs build/webpages.espfs.o.tmp
+	$(Q) $(LD) -nostdlib -Wl,-r build/webpages.espfs.o.tmp -o build/webpages.espfs.o -Wl,-T webpages.espfs.ld
 	$(Q) $(AR) cru $@ build/webpages.espfs.o
 
 espfs/mkespfsimage/mkespfsimage: espfs/mkespfsimage/
