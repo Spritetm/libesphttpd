@@ -85,12 +85,12 @@ static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(void *arg) {
 	for (int i=0; i<MAX_CONN; i++) {
 		if (connData[i].remote_port == espconn->proto.tcp->remote_port &&
 						os_memcmp(connData[i].remote_ip, espconn->proto.tcp->remote_ip, 4) == 0) {
-			if (arg != connData[i].conn) connData[i].conn = arg; // yes, this happens!?
+			connData[i].conn=espconn;
 			return &connData[i];
 		}
 	}
 	//Shouldn't happen.
-	os_printf("*** Unknown connection 0x%p\n", arg);
+	os_printf("*** Unknown connection " IPSTR ":%d\n", IP2STR(&espconn->proto.tcp->remote_ip), espconn->proto.tcp->remote_port);
 	return NULL;
 }
 
@@ -280,7 +280,7 @@ int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
 	int x=wifi_get_opmode();
 	//Check if we have an softap interface; bail out if not
 	if (x!=2 && x!=3) return HTTPD_CGI_NOTFOUND;
-	remadr=(uint32 *)connData->conn->proto.tcp->remote_ip;
+	remadr=(uint32 *)connData->remote_ip;
 	wifi_get_ip_info(SOFTAP_IF, &apip);
 	if ((*remadr & apip.netmask.addr) == (apip.ip.addr & apip.netmask.addr)) {
 		return cgiRedirectToHostname(connData);
@@ -322,9 +322,8 @@ static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
 	conn->priv->sendBuffLen=0;
 
 	if (conn->cgi==NULL) { //Marked for destruction?
-		os_printf("Conn %p is done. Closing.\n", conn->conn);
+		os_printf("Pool slot %d is done. Closing.\n", conn->slot);
 		espconn_disconnect(conn->conn);
-		httpdRetireConn(conn);
 		return; //No need to call httpdFlushSendBuffer.
 	}
 
@@ -545,23 +544,11 @@ static void ICACHE_FLASH_ATTR httpdReconCb(void *arg, sint8 err) {
 }
 
 static void ICACHE_FLASH_ATTR httpdDisconCb(void *arg) {
-	//The esp sdk passes through wrong arg here, namely the one of the *listening* socket.
-	//That is why we can't use (HttpdConnData)arg->sock here.
-	//Just look at all the sockets and kill the slot if needed.
-	int i;
-	for (i=0; i<MAX_CONN; i++) {
-		if (connData[i].conn!=NULL) {
-			//Why the >=ESPCONN_CLOSE and not ==? Well, seems the stack sometimes de-allocates
-			//espconns under our noses, especially when connections are interrupted. The memory
-			//is then used for something else, and we can use that to capture *most* of the
-			//disconnect cases.
-			if (connData[i].conn->state==ESPCONN_NONE || connData[i].conn->state>=ESPCONN_CLOSE) {
-				connData[i].conn=NULL;
-				if (connData[i].cgi!=NULL) connData[i].cgi(&connData[i]); //flush cgi data
-				httpdRetireConn(&connData[i]);
-			}
-		}
-	}
+	//The esp sdk passes the handle of the listening socket to us with the
+	//remote ip and port changed for the connection it is referring to.
+	HttpdConnData *conn=httpdFindConnData(arg);
+	if (conn==NULL) return;
+	httpdRetireConn(conn);
 }
 
 
@@ -570,7 +557,7 @@ static void ICACHE_FLASH_ATTR httpdConnectCb(void *arg) {
 	int i;
 	//Find empty conndata in pool
 	for (i=0; i<MAX_CONN; i++) if (connData[i].conn==NULL) break;
-	os_printf("Con req, conn=%p, pool slot %d\n", conn, i);
+	os_printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(&conn->proto.tcp->remote_ip), conn->proto.tcp->remote_port, i);
 	if (i==MAX_CONN) {
 		os_printf("Aiee, conn pool overflow!\n");
 		espconn_disconnect(conn);
@@ -600,6 +587,7 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 
 	for (i=0; i<MAX_CONN; i++) {
 		connData[i].conn=NULL;
+		connData[i].slot=i;
 	}
 	httpdConn.type=ESPCONN_TCP;
 	httpdConn.state=ESPCONN_NONE;
@@ -607,7 +595,7 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 	httpdConn.proto.tcp=&httpdTcp;
 	builtInUrls=fixedUrls;
 
-	os_printf("Httpd init, conn=%p\n", &httpdConn);
+	os_printf("Httpd init\n");
 	espconn_regist_connectcb(&httpdConn, httpdConnectCb);
 	espconn_accept(&httpdConn);
 	espconn_tcp_set_max_con_allow(&httpdConn, MAX_CONN);
