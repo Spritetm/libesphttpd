@@ -34,6 +34,7 @@ struct HttpdConnData {
 	HttpdPostData *post;
 	int remote_port;
 	uint8 remote_ip[4];
+	uint8 slot;
 };
 
 //A struct describing the POST data sent inside the http connection.  This is used by the CGI functions
