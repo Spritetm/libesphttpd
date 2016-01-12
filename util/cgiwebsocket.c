@@ -123,7 +123,7 @@ int ICACHE_FLASH_ATTR cgiWebsockBroadcast(char *resource, char *data, int len, i
 	Websock *lw=llStart;
 	int ret=0;
 	while (lw!=NULL) {
-		if (os_strcmp(lw->conn->url, resource)==0) {
+		if (strcmp(lw->conn->url, resource)==0) {
 			cgiWebsocketSend(lw, data, len, flags);
 			ret++;
 		}
@@ -143,7 +143,7 @@ int ICACHE_FLASH_ATTR cgiWebSocketRecv(HttpdConnData *connData, char *data, int 
 	int i, j, sl;
 	Websock *ws=(Websock*)connData->cgiPrivData;
 	for (i=0; i<len; i++) {
-//		os_printf("Ws: State %d byte 0x%02X\n", ws->priv->wsStatus, data[i]);
+//		printf("Ws: State %d byte 0x%02X\n", ws->priv->wsStatus, data[i]);
 		if (ws->priv->wsStatus==ST_FLAGS) {
 			ws->priv->maskCtr=0;
 			ws->priv->frameCont=0;
@@ -216,7 +216,7 @@ static void ICACHE_FLASH_ATTR websockFree(Websock *ws) {
 		while (lws!=NULL && lws->priv->next!=ws) lws=lws->priv->next;
 		if (lws!=NULL) lws->priv->next=ws->priv->next;
 	}
-	if (ws->priv) os_free(ws->priv);
+	if (ws->priv) free(ws->priv);
 }
 
 //Websocket 'cgi' implementation
@@ -226,37 +226,37 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 	sha1nfo s;
 	if (connData->conn==NULL) {
 		//Connection aborted. Clean up.
-//		os_printf("WS: Cleanup\n");
+//		printf("WS: Cleanup\n");
 		if (connData->cgiPrivData) {
 			Websock *ws=(Websock*)connData->cgiPrivData;
 			websockFree(ws);
-			os_free(connData->cgiPrivData);
+			free(connData->cgiPrivData);
 			connData->cgiPrivData=NULL;
 		}
 		return HTTPD_CGI_DONE;
 	}
 	
 	if (connData->cgiPrivData==NULL) {
-//		os_printf("WS: First call\n");
+//		printf("WS: First call\n");
 		//First call here. Check if client headers are OK, send server header.
 		i=httpdGetHeader(connData, "Upgrade", buff, sizeof(buff)-1);
-//		os_printf("WS: Upgrade: %s\n", buff);
-		if (i && os_strcmp(buff, "websocket")==0) {
+//		printf("WS: Upgrade: %s\n", buff);
+		if (i && strcmp(buff, "websocket")==0) {
 			i=httpdGetHeader(connData, "Sec-WebSocket-Key", buff, sizeof(buff)-1);
 			if (i) {
-//				os_printf("WS: Key: %s\n", buff);
+//				printf("WS: Key: %s\n", buff);
 				//Seems like a WebSocket connection.
 				// Alloc structs
-				connData->cgiPrivData=os_malloc(sizeof(Websock));
-				os_memset(connData->cgiPrivData, 0, sizeof(Websock));
+				connData->cgiPrivData=malloc(sizeof(Websock));
+				memset(connData->cgiPrivData, 0, sizeof(Websock));
 				Websock *ws=(Websock*)connData->cgiPrivData;
-				ws->priv=os_malloc(sizeof(WebsockPriv));
-				os_memset(ws->priv, 0, sizeof(WebsockPriv));
+				ws->priv=malloc(sizeof(WebsockPriv));
+				memset(ws->priv, 0, sizeof(WebsockPriv));
 				ws->conn=connData;
 				//Reply with the right headers.
-				os_strcat(buff, WS_GUID);
+				strcat(buff, WS_GUID);
 				sha1_init(&s);
-				sha1_write(&s, buff, os_strlen(buff));
+				sha1_write(&s, buff, strlen(buff));
 				httpdStartResponse(connData, 101);
 				httpdHeader(connData, "Upgrade", "websocket");
 				httpdHeader(connData, "Connection", "upgrade");
@@ -291,7 +291,7 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 	
 	if (ws && ws->priv->mustClose) {
 		websockFree(ws);
-		os_free(connData->cgiPrivData);
+		free(connData->cgiPrivData);
 		connData->cgiPrivData=NULL;
 		return HTTPD_CGI_DONE;
 	}

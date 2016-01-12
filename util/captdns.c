@@ -166,7 +166,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 	DnsHeader *hdr=(DnsHeader*)p;
 	DnsHeader *rhdr=(DnsHeader*)&reply[0];
 	p+=sizeof(DnsHeader);
-//	os_printf("DNS packet: id 0x%X flags 0x%X rcode 0x%X qcnt %d ancnt %d nscount %d arcount %d len %d\n", 
+//	printf("DNS packet: id 0x%X flags 0x%X rcode 0x%X qcnt %d ancnt %d nscount %d arcount %d len %d\n", 
 //		ntohs(&hdr->id), hdr->flags, hdr->rcode, ntohs(&hdr->qdcount), ntohs(&hdr->ancount), ntohs(&hdr->nscount), ntohs(&hdr->arcount), length);
 	//Some sanity checks:
 	if (length>512) return; 									//Packet is longer than DNS implementation allows
@@ -174,7 +174,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 	if (hdr->ancount || hdr->nscount || hdr->arcount) return;	//this is a reply, don't know what to do with it
 	if (hdr->flags&FLAG_TC) return;								//truncated, can't use this
 	//Reply is basically the request plus the needed data
-	os_memcpy(reply, pusrdata, length);
+	memcpy(reply, pusrdata, length);
 	rhdr->flags|=FLAG_QR;
 	for (i=0; i<ntohs(&hdr->qdcount); i++) {
 		//Grab the labels in the q string
@@ -182,7 +182,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 		if (p==NULL) return;
 		DnsQuestionFooter *qf=(DnsQuestionFooter*)p;
 		p+=sizeof(DnsQuestionFooter);
-		os_printf("DNS: Q (type 0x%X class 0x%X) for %s\n", ntohs(&qf->type), ntohs(&qf->class), buff);
+		printf("DNS: Q (type 0x%X class 0x%X) for %s\n", ntohs(&qf->type), ntohs(&qf->class), buff);
 		if (ntohs(&qf->type)==QTYPE_A) {
 			//They want to know the IPv4 address of something.
 			//Build the response.
@@ -202,7 +202,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			*rend++=ip4_addr3(&info.ip);
 			*rend++=ip4_addr4(&info.ip);
 			setn16(&rhdr->ancount, ntohs(&rhdr->ancount)+1);
-//			os_printf("Added A rec to resp. Resp len is %d\n", (rend-reply));
+//			printf("Added A rec to resp. Resp len is %d\n", (rend-reply));
 		} else if (ntohs(&qf->type)==QTYPE_NS) {
 			//Give ns server. Basically can be whatever we want because it'll get resolved to our IP later anyway.
 			rend=strToLabel(buff, rend, sizeof(reply)-(rend-reply)); //Add the label
@@ -217,7 +217,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			*rend++='s';
 			*rend++=0;
 			setn16(&rhdr->ancount, ntohs(&rhdr->ancount)+1);
-//			os_printf("Added NS rec to resp. Resp len is %d\n", (rend-reply));
+//			printf("Added NS rec to resp. Resp len is %d\n", (rend-reply));
 		} else if (ntohs(&qf->type)==QTYPE_URI) {
 			//Give uri to us
 			rend=strToLabel(buff, rend, sizeof(reply)-(rend-reply)); //Add the label
@@ -234,7 +234,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			memcpy(rend, "http://esp.nonet", 16);
 			rend+=16;
 			setn16(&rhdr->ancount, ntohs(&rhdr->ancount)+1);
-//			os_printf("Added NS rec to resp. Resp len is %d\n", (rend-reply));
+//			printf("Added NS rec to resp. Resp len is %d\n", (rend-reply));
 		}
 	}
 	//Send the response

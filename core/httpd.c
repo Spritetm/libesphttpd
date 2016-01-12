@@ -74,8 +74,8 @@ const char ICACHE_FLASH_ATTR *httpdGetMimetype(char *url) {
 	while (ext!=url && *ext!='.') ext--;
 	if (*ext=='.') ext++;
 	
-	//ToDo: os_strcmp is case sensitive; we may want to do case-intensive matching here...
-	while (mimeTypes[i].ext!=NULL && os_strcmp(ext, mimeTypes[i].ext)!=0) i++;
+	//ToDo: strcmp is case sensitive; we may want to do case-intensive matching here...
+	while (mimeTypes[i].ext!=NULL && strcmp(ext, mimeTypes[i].ext)!=0) i++;
 	return mimeTypes[i].mimetype;
 }
 
@@ -84,25 +84,25 @@ static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(void *arg) {
 	struct espconn *espconn = arg;
 	for (int i=0; i<MAX_CONN; i++) {
 		if (connData[i].remote_port == espconn->proto.tcp->remote_port &&
-						os_memcmp(connData[i].remote_ip, espconn->proto.tcp->remote_ip, 4) == 0) {
+						memcmp(connData[i].remote_ip, espconn->proto.tcp->remote_ip, 4) == 0) {
 			connData[i].conn=espconn;
 			return &connData[i];
 		}
 	}
 	//Shouldn't happen.
-	os_printf("*** Unknown connection " IPSTR ":%d\n", IP2STR(&espconn->proto.tcp->remote_ip), espconn->proto.tcp->remote_port);
+	printf("*** Unknown connection " IPSTR ":%d\n", IP2STR(&espconn->proto.tcp->remote_ip), espconn->proto.tcp->remote_port);
 	return NULL;
 }
 
 
 //Retires a connection for re-use
 static void ICACHE_FLASH_ATTR httpdRetireConn(HttpdConnData *conn) {
-	if (conn->post->buff!=NULL) os_free(conn->post->buff);
+	if (conn->post->buff!=NULL) free(conn->post->buff);
 	conn->post->buff=NULL;
 	conn->cgi=NULL;
 	conn->conn=NULL;
 	conn->remote_port=0;
-	os_memset(conn->remote_ip, 0, 4);
+	memset(conn->remote_ip, 0, 4);
 }
 
 //Stupid li'l helper function that returns the value of a hex char.
@@ -151,18 +151,18 @@ int ICACHE_FLASH_ATTR httpdFindArg(char *line, char *arg, char *buff, int buffLe
 	if (line==NULL) return -1;
 	p=line;
 	while(p!=NULL && *p!='\n' && *p!='\r' && *p!=0) {
-		os_printf("findArg: %s\n", p);
-		if (os_strncmp(p, arg, os_strlen(arg))==0 && p[strlen(arg)]=='=') {
-			p+=os_strlen(arg)+1; //move p to start of value
-			e=(char*)os_strstr(p, "&");
-			if (e==NULL) e=p+os_strlen(p);
-			os_printf("findArg: val %s len %d\n", p, (e-p));
+		printf("findArg: %s\n", p);
+		if (strncmp(p, arg, strlen(arg))==0 && p[strlen(arg)]=='=') {
+			p+=strlen(arg)+1; //move p to start of value
+			e=(char*)strstr(p, "&");
+			if (e==NULL) e=p+strlen(p);
+			printf("findArg: val %s len %d\n", p, (e-p));
 			return httpdUrlDecode(p, (e-p), buff, buffLen);
 		}
-		p=(char*)os_strstr(p, "&");
+		p=(char*)strstr(p, "&");
 		if (p!=NULL) p+=1;
 	}
-	os_printf("Finding %s in %s: Not found :/\n", arg, line);
+	printf("Finding %s in %s: Not found :/\n", arg, line);
 	return -1; //not found
 }
 
@@ -174,7 +174,7 @@ int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *re
 	while (p<(conn->priv->head+conn->priv->headPos)) {
 		while(*p<=32 && *p!=0) p++; //skip crap at start
 		//See if this is the header
-		if (os_strncmp(p, header, strlen(header))==0 && p[strlen(header)]==':') {
+		if (strncmp(p, header, strlen(header))==0 && p[strlen(header)]==':') {
 			//Skip 'key:' bit of header line
 			p=p+strlen(header)+1;
 			//Skip past spaces after the colon
@@ -198,7 +198,7 @@ int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *re
 void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
 	char buff[128];
 	int l;
-	l=os_sprintf(buff, "HTTP/1.0 %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\n", code);
+	l=sprintf(buff, "HTTP/1.0 %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\n", code);
 	httpdSend(conn, buff, l);
 }
 
@@ -207,7 +207,7 @@ void ICACHE_FLASH_ATTR httpdHeader(HttpdConnData *conn, const char *field, const
 	char buff[256];
 	int l;
 
-	l=os_sprintf(buff, "%s: %s\r\n", field, val);
+	l=sprintf(buff, "%s: %s\r\n", field, val);
 	httpdSend(conn, buff, l);
 }
 
@@ -221,7 +221,7 @@ void ICACHE_FLASH_ATTR httpdEndHeaders(HttpdConnData *conn) {
 void ICACHE_FLASH_ATTR httpdRedirect(HttpdConnData *conn, char *newUrl) {
 	char buff[1024];
 	int l;
-	l=os_sprintf(buff, "HTTP/1.1 302 Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nLocation: %s\r\n\r\nMoved to %s\r\n", newUrl, newUrl);
+	l=sprintf(buff, "HTTP/1.1 302 Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nLocation: %s\r\n\r\nMoved to %s\r\n", newUrl, newUrl);
 	httpdSend(conn, buff, l);
 }
 
@@ -249,12 +249,12 @@ int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
 		return HTTPD_CGI_DONE;
 	}
 	if (connData->hostName==NULL) {
-		os_printf("Huh? No hostname.\n");
+		printf("Huh? No hostname.\n");
 		return HTTPD_CGI_NOTFOUND;
 	}
 
 	//Quick and dirty code to see if host is an IP
-	if (os_strlen(connData->hostName)>8) {
+	if (strlen(connData->hostName)>8) {
 		isIP=1;
 		for (x=0; x<strlen(connData->hostName); x++) {
 			if (connData->hostName[x]!='.' && (connData->hostName[x]<'0' || connData->hostName[x]>'9')) isIP=0;
@@ -262,10 +262,10 @@ int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
 	}
 	if (isIP) return HTTPD_CGI_NOTFOUND;
 	//Check hostname; pass on if the same
-	if (os_strcmp(connData->hostName, (char*)connData->cgiArg)==0) return HTTPD_CGI_NOTFOUND;
+	if (strcmp(connData->hostName, (char*)connData->cgiArg)==0) return HTTPD_CGI_NOTFOUND;
 	//Not the same. Redirect to real hostname.
-	os_sprintf(buff, "http://%s/", (char*)connData->cgiArg);
-	os_printf("Redirecting to hostname url %s\n", buff);
+	sprintf(buff, "http://%s/", (char*)connData->cgiArg);
+	printf("Redirecting to hostname url %s\n", buff);
 	httpdRedirect(connData, buff);
 	return HTTPD_CGI_DONE;
 }
@@ -296,7 +296,7 @@ int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
 int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) {
 	if (len<0) len=strlen(data);
 	if (conn->priv->sendBuffLen+len>MAX_SENDBUFF_LEN) return 0;
-	os_memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
+	memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
 	conn->priv->sendBuffLen+=len;
 	return 1;
 }
@@ -322,7 +322,7 @@ static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
 	conn->priv->sendBuffLen=0;
 
 	if (conn->cgi==NULL) { //Marked for destruction?
-		os_printf("Pool slot %d is done. Closing.\n", conn->slot);
+		printf("Pool slot %d is done. Closing.\n", conn->slot);
 		espconn_disconnect(conn->conn);
 		return; //No need to call httpdFlushSendBuffer.
 	}
@@ -332,7 +332,7 @@ static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
 		conn->cgi=NULL; //mark for destruction.
 	}
 	if (r==HTTPD_CGI_NOTFOUND || r==HTTPD_CGI_AUTHENTICATED) {
-		os_printf("ERROR! CGI fn returns code %d after sending data! Bad CGI!\n", r);
+		printf("ERROR! CGI fn returns code %d after sending data! Bad CGI!\n", r);
 		conn->cgi=NULL; //mark for destruction.
 	}
 	httpdFlushSendBuffer(conn);
@@ -348,7 +348,7 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 	int r;
 	int i=0;
 	if (conn->url==NULL) {
-		os_printf("WtF? url = NULL\n");
+		printf("WtF? url = NULL\n");
 		return; //Shouldn't happen
 	}
 	//See if we can find a CGI that's happy to handle the request.
@@ -357,12 +357,12 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 		while (builtInUrls[i].url!=NULL) {
 			int match=0;
 			//See if there's a literal match
-			if (os_strcmp(builtInUrls[i].url, conn->url)==0) match=1;
+			if (strcmp(builtInUrls[i].url, conn->url)==0) match=1;
 			//See if there's a wildcard match
-			if (builtInUrls[i].url[os_strlen(builtInUrls[i].url)-1]=='*' &&
-					os_strncmp(builtInUrls[i].url, conn->url, os_strlen(builtInUrls[i].url)-1)==0) match=1;
+			if (builtInUrls[i].url[strlen(builtInUrls[i].url)-1]=='*' &&
+					strncmp(builtInUrls[i].url, conn->url, strlen(builtInUrls[i].url)-1)==0) match=1;
 			if (match) {
-				os_printf("Is url index %d\n", i);
+				printf("Is url index %d\n", i);
 				conn->cgiData=NULL;
 				conn->cgi=builtInUrls[i].cgiCb;
 				conn->cgiArg=builtInUrls[i].cgiArg;
@@ -373,7 +373,7 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 		if (builtInUrls[i].url==NULL) {
 			//Drat, we're at the end of the URL table. This usually shouldn't happen. Well, just
 			//generate a built-in 404 to handle this.
-			os_printf("%s not found. 404!\n", conn->url);
+			printf("%s not found. 404!\n", conn->url);
 			httpdSend(conn, httpNotFoundHeader, -1);
 			httpdFlushSendBuffer(conn);
 			conn->cgi=NULL; //mark for destruction
@@ -405,14 +405,14 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 	int i;
 	char firstLine=0;
 	
-	if (os_strncmp(h, "GET ", 4)==0) {
+	if (strncmp(h, "GET ", 4)==0) {
 		conn->requestType = HTTPD_METHOD_GET;
 		firstLine=1;
-	} else if (os_strncmp(h, "Host:", 5)==0) {
+	} else if (strncmp(h, "Host:", 5)==0) {
 		i=5;
 		while (h[i]==' ') i++;
 		conn->hostName=&h[i];
-	} else if (os_strncmp(h, "POST ", 5)==0) {
+	} else if (strncmp(h, "POST ", 5)==0) {
 		conn->requestType = HTTPD_METHOD_POST;
 		firstLine=1;
 	}
@@ -426,22 +426,22 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 		conn->url=h+i+1;
 
 		//Figure out end of url.
-		e=(char*)os_strstr(conn->url, " ");
+		e=(char*)strstr(conn->url, " ");
 		if (e==NULL) return; //wtf?
 		*e=0; //terminate url part
 
-		os_printf("URL = %s\n", conn->url);
+		printf("URL = %s\n", conn->url);
 		//Parse out the URL part before the GET parameters.
-		conn->getArgs=(char*)os_strstr(conn->url, "?");
+		conn->getArgs=(char*)strstr(conn->url, "?");
 		if (conn->getArgs!=0) {
 			*conn->getArgs=0;
 			conn->getArgs++;
-			os_printf("GET args = %s\n", conn->getArgs);
+			printf("GET args = %s\n", conn->getArgs);
 		} else {
 			conn->getArgs=NULL;
 		}
 
-	} else if (os_strncmp(h, "Content-Length:", 15)==0) {
+	} else if (strncmp(h, "Content-Length:", 15)==0) {
 		i=15;
 		//Skip trailing spaces
 		while (h[i]==' ') i++;
@@ -455,18 +455,18 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 		} else {
 			conn->post->buffSize = conn->post->len;
 		}
-		os_printf("Mallocced buffer for %d + 1 bytes of post data.\n", conn->post->buffSize);
-		conn->post->buff=(char*)os_malloc(conn->post->buffSize + 1);
+		printf("Mallocced buffer for %d + 1 bytes of post data.\n", conn->post->buffSize);
+		conn->post->buff=(char*)malloc(conn->post->buffSize + 1);
 		conn->post->buffLen=0;
-	} else if (os_strncmp(h, "Content-Type: ", 14)==0) {
-		if (os_strstr(h, "multipart/form-data")) {
+	} else if (strncmp(h, "Content-Type: ", 14)==0) {
+		if (strstr(h, "multipart/form-data")) {
 			// It's multipart form data so let's pull out the boundary for future use
 			char *b;
-			if ((b = os_strstr(h, "boundary=")) != NULL) {
+			if ((b = strstr(h, "boundary=")) != NULL) {
 				conn->post->multipartBoundary = b + 7; // move the pointer 2 chars before boundary then fill them with dashes
 				conn->post->multipartBoundary[0] = '-';
 				conn->post->multipartBoundary[1] = '-';
-				os_printf("boundary = %s\n", conn->post->multipartBoundary);
+				printf("boundary = %s\n", conn->post->multipartBoundary);
 			}
 		}
 	}
@@ -495,7 +495,7 @@ static void ICACHE_FLASH_ATTR httpdRecvCb(void *arg, char *data, unsigned short 
 			if (conn->priv->headPos!=MAX_HEAD_LEN) conn->priv->head[conn->priv->headPos++]=data[x];
 			conn->priv->head[conn->priv->headPos]=0;
 			//Scan for /r/n/r/n. Receiving this indicate the headers end.
-			if (data[x]=='\n' && (char *)os_strstr(conn->priv->head, "\r\n\r\n")!=NULL) {
+			if (data[x]=='\n' && (char *)strstr(conn->priv->head, "\r\n\r\n")!=NULL) {
 				//Indicate we're done with the headers.
 				conn->post->len=0;
 				//Reset url data
@@ -503,7 +503,7 @@ static void ICACHE_FLASH_ATTR httpdRecvCb(void *arg, char *data, unsigned short 
 				//Iterate over all received headers and parse them.
 				p=conn->priv->head;
 				while(p<(&conn->priv->head[conn->priv->headPos-4])) {
-					e=(char *)os_strstr(p, "\r\n"); //Find end of header line
+					e=(char *)strstr(p, "\r\n"); //Find end of header line
 					if (e==NULL) break;			//Shouldn't happen.
 					e[0]=0;						//Zero-terminate header
 					httpdParseHeader(p, conn);	//and parse it.
@@ -538,7 +538,7 @@ static void ICACHE_FLASH_ATTR httpdRecvCb(void *arg, char *data, unsigned short 
 
 static void ICACHE_FLASH_ATTR httpdReconCb(void *arg, sint8 err) {
 	HttpdConnData *conn=httpdFindConnData(arg);
-	os_printf("ReconCb\n");
+	printf("ReconCb\n");
 	if (conn==NULL) return;
 	//Yeah... No idea what to do here. ToDo: figure something out.
 }
@@ -557,9 +557,9 @@ static void ICACHE_FLASH_ATTR httpdConnectCb(void *arg) {
 	int i;
 	//Find empty conndata in pool
 	for (i=0; i<MAX_CONN; i++) if (connData[i].conn==NULL) break;
-	os_printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(&conn->proto.tcp->remote_ip), conn->proto.tcp->remote_port, i);
+	printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(&conn->proto.tcp->remote_ip), conn->proto.tcp->remote_port, i);
 	if (i==MAX_CONN) {
-		os_printf("Aiee, conn pool overflow!\n");
+		printf("Aiee, conn pool overflow!\n");
 		espconn_disconnect(conn);
 		return;
 	}
@@ -573,7 +573,7 @@ static void ICACHE_FLASH_ATTR httpdConnectCb(void *arg) {
 	connData[i].post->len=-1;
 	connData[i].hostName=NULL;
 	connData[i].remote_port=conn->proto.tcp->remote_port;
-	os_memcpy(connData[i].remote_ip, conn->proto.tcp->remote_ip, 4);
+	memcpy(connData[i].remote_ip, conn->proto.tcp->remote_ip, 4);
 
 	espconn_regist_recvcb(conn, httpdRecvCb);
 	espconn_regist_reconcb(conn, httpdReconCb);
@@ -595,7 +595,7 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 	httpdConn.proto.tcp=&httpdTcp;
 	builtInUrls=fixedUrls;
 
-	os_printf("Httpd init\n");
+	printf("Httpd init\n");
 	espconn_regist_connectcb(&httpdConn, httpdConnectCb);
 	espconn_accept(&httpdConn);
 	espconn_tcp_set_max_con_allow(&httpdConn, MAX_CONN);

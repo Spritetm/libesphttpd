@@ -12,8 +12,11 @@
 #include <gpio.h>
 #include <mem.h>
 #include <osapi.h>
+#ifndef FREERTOS
 #include <upgrade.h>
+#endif
 #include <user_interface.h>
 
+#include "platform.h"
 #include "espmissingincludes.h"
 
