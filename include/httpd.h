@@ -20,7 +20,7 @@ typedef int (* cgiRecvHandler)(HttpdConnData *connData, char *data, int len);
 
 //A struct describing a http connection. This gets passed to cgi functions.
 struct HttpdConnData {
-	struct espconn *conn;
+	ConnTypePtr conn;
 	char requestType;
 	char *url;
 	char *getArgs;

@@ -2,7 +2,9 @@
 #define PLATFORM_H
 
 #ifdef FREERTOS
-xxx
+//#include "esp_timer.h"
+
+typedef int* ConnTypePtr;
 #else
 #define printf(...) os_printf(__VA_ARGS__)
 #define sprintf(str, ...) os_sprintf(str, __VA_ARGS__)
@@ -18,6 +20,7 @@ xxx
 #define strstr(a, b) os_strstr(a, b)
 #define strlen(a) os_strlen(a)
 #define memcmp(a, b, c) os_memcmp(a, b, c)
+typedef struct espconn* ConnTypePtr;
 #endif
 
 

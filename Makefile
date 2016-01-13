@@ -13,6 +13,7 @@ YUI-COMPRESSOR ?= /usr/bin/yui-compressor
 USE_HEATSHRINK ?= yes
 HTTPD_WEBSOCKETS ?= yes
 USE_OPENSDK ?= no
+FREERTOS ?= no
 
 # Output directors to store intermediate compiled files
 # relative to the project directory
@@ -75,6 +76,9 @@ Q := @
 vecho := @echo
 endif
 
+ifeq ("$(FREERTOS)","yes")
+CFLAGS		+= -DFREERTOS
+endif
 
 ifeq ("$(USE_OPENSDK)","yes")
 CFLAGS		+= -DUSE_OPENSDK
