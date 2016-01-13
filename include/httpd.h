@@ -55,19 +55,26 @@ typedef struct {
 	const void *cgiArg;
 } HttpdBuiltInUrl;
 
-int ICACHE_FLASH_ATTR cgiRedirect(HttpdConnData *connData);
-int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData);
-int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData);
-void ICACHE_FLASH_ATTR httpdRedirect(HttpdConnData *conn, char *newUrl);
+int cgiRedirect(HttpdConnData *connData);
+int cgiRedirectToHostname(HttpdConnData *connData);
+int cgiRedirectApClientToHostname(HttpdConnData *connData);
+void httpdRedirect(HttpdConnData *conn, char *newUrl);
 int httpdUrlDecode(char *val, int valLen, char *ret, int retLen);
-int ICACHE_FLASH_ATTR httpdFindArg(char *line, char *arg, char *buff, int buffLen);
-void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port);
+int httpdFindArg(char *line, char *arg, char *buff, int buffLen);
+void httpdInit(HttpdBuiltInUrl *fixedUrls, int port);
 const char *httpdGetMimetype(char *url);
-void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code);
-void ICACHE_FLASH_ATTR httpdHeader(HttpdConnData *conn, const char *field, const char *val);
-void ICACHE_FLASH_ATTR httpdEndHeaders(HttpdConnData *conn);
-int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *ret, int retLen);
-int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len);
-void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn);
+void httpdStartResponse(HttpdConnData *conn, int code);
+void httpdHeader(HttpdConnData *conn, const char *field, const char *val);
+void httpdEndHeaders(HttpdConnData *conn);
+int httpdGetHeader(HttpdConnData *conn, char *header, char *ret, int retLen);
+int httpdSend(HttpdConnData *conn, const char *data, int len);
+void httpdFlushSendBuffer(HttpdConnData *conn);
+
+//Platform dependent code should call these.
+void httpdSentCb(ConnTypePtr conn, char *remIp, int remPort);
+void httpdRecvCb(ConnTypePtr conn, char *remIp, int remPort, char *data, unsigned short len);
+void httpdDisconCb(ConnTypePtr conn, char *remIp, int remPort);
+int httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort);
+
 
 #endif

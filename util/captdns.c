@@ -1,5 +1,8 @@
 #include <esp8266.h>
 
+//Sorry, non-os only. ToDo: re-frobnicate for FreeRTOS
+#ifndef FREERTOS
+
 /*
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
@@ -250,3 +253,5 @@ void ICACHE_FLASH_ATTR captdnsInit(void) {
 	espconn_regist_recvcb(&conn, captdnsRecv);
 	espconn_create(&conn);
 }
+
+#endif

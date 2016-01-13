@@ -79,7 +79,7 @@ int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 		return HTTPD_CGI_MORE;
 	}
 	//Send 1K of flash per call. We will get called again if we haven't sent 512K yet.
-	espconn_sent(connData->conn, (uint8 *)(*pos), 1024);
+	httpdSend(connData, (char*)(*pos), 1024);
 	*pos+=1024;
 	if (*pos>=0x40200000+(512*1024)) return HTTPD_CGI_DONE; else return HTTPD_CGI_MORE;
 }

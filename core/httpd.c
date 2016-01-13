@@ -14,6 +14,7 @@ Esp8266 http server - core routines
 
 #include <esp8266.h>
 #include "httpd.h"
+#include "httpd-platform.h"
 
 
 //Max length of request head
@@ -40,10 +41,6 @@ struct HttpdPriv {
 static HttpdPriv connPrivData[MAX_CONN];
 static HttpdConnData connData[MAX_CONN];
 static HttpdPostData connPostData[MAX_CONN];
-
-//Listening connection data
-static struct espconn httpdConn;
-static esp_tcp httpdTcp;
 
 //Struct to keep extension->mime data in
 typedef struct {
@@ -79,18 +76,17 @@ const char ICACHE_FLASH_ATTR *httpdGetMimetype(char *url) {
 	return mimeTypes[i].mimetype;
 }
 
-//Looks up the connData info for a specific esp connection
-static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(void *arg) {
-	struct espconn *espconn = arg;
+//Looks up the connData info for a specific connection
+static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(ConnTypePtr conn, char *remIp, int remPort) {
 	for (int i=0; i<MAX_CONN; i++) {
-		if (connData[i].remote_port == espconn->proto.tcp->remote_port &&
-						memcmp(connData[i].remote_ip, espconn->proto.tcp->remote_ip, 4) == 0) {
-			connData[i].conn=espconn;
+		if (connData[i].remote_port == remPort &&
+						memcmp(connData[i].remote_ip, remIp, 4) == 0) {
+			connData[i].conn=conn;
 			return &connData[i];
 		}
 	}
 	//Shouldn't happen.
-	printf("*** Unknown connection " IPSTR ":%d\n", IP2STR(&espconn->proto.tcp->remote_ip), espconn->proto.tcp->remote_port);
+	printf("*** Unknown connection " IPSTR ":%d\n", IP2STR(&remIp), remPort);
 	return NULL;
 }
 
@@ -305,16 +301,16 @@ int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) 
 //are doing!
 void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
 	if (conn->priv->sendBuffLen!=0) {
-		espconn_sent(conn->conn, (uint8_t*)conn->priv->sendBuff, conn->priv->sendBuffLen);
+		httpdPlatSendData(conn->conn, conn->priv->sendBuff, conn->priv->sendBuffLen);
 		conn->priv->sendBuffLen=0;
 	}
 }
 
 //Callback called when the data on a socket has been successfully
 //sent.
-static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
+void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) {
 	int r;
-	HttpdConnData *conn=httpdFindConnData(arg);
+	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
 	char sendBuff[MAX_SENDBUFF_LEN];
 
 	if (conn==NULL) return;
@@ -323,7 +319,7 @@ static void ICACHE_FLASH_ATTR httpdSentCb(void *arg) {
 
 	if (conn->cgi==NULL) { //Marked for destruction?
 		printf("Pool slot %d is done. Closing.\n", conn->slot);
-		espconn_disconnect(conn->conn);
+		httpdPlatDisconnect(conn->conn);
 		return; //No need to call httpdFlushSendBuffer.
 	}
 
@@ -474,11 +470,11 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 
 
 //Callback called when there's data available on a socket.
-static void ICACHE_FLASH_ATTR httpdRecvCb(void *arg, char *data, unsigned short len) {
+void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsigned short len) {
 	int x;
 	char *p, *e;
 	char sendBuff[MAX_SENDBUFF_LEN];
-	HttpdConnData *conn=httpdFindConnData(arg);
+	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
 	if (conn==NULL) return;
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
@@ -536,32 +532,23 @@ static void ICACHE_FLASH_ATTR httpdRecvCb(void *arg, char *data, unsigned short 
 	}
 }
 
-static void ICACHE_FLASH_ATTR httpdReconCb(void *arg, sint8 err) {
-	HttpdConnData *conn=httpdFindConnData(arg);
-	printf("ReconCb\n");
-	if (conn==NULL) return;
-	//Yeah... No idea what to do here. ToDo: figure something out.
-}
-
-static void ICACHE_FLASH_ATTR httpdDisconCb(void *arg) {
+void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort) {
 	//The esp sdk passes the handle of the listening socket to us with the
 	//remote ip and port changed for the connection it is referring to.
-	HttpdConnData *conn=httpdFindConnData(arg);
-	if (conn==NULL) return;
-	httpdRetireConn(conn);
+	HttpdConnData *hconn=httpdFindConnData(rconn, remIp, remPort);
+	if (hconn==NULL) return;
+	httpdRetireConn(hconn);
 }
 
 
-static void ICACHE_FLASH_ATTR httpdConnectCb(void *arg) {
-	struct espconn *conn=arg;
+int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort) {
 	int i;
 	//Find empty conndata in pool
 	for (i=0; i<MAX_CONN; i++) if (connData[i].conn==NULL) break;
 	printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(&conn->proto.tcp->remote_ip), conn->proto.tcp->remote_port, i);
 	if (i==MAX_CONN) {
 		printf("Aiee, conn pool overflow!\n");
-		espconn_disconnect(conn);
-		return;
+		return 0;
 	}
 	connData[i].priv=&connPrivData[i];
 	connData[i].conn=conn;
@@ -572,13 +559,10 @@ static void ICACHE_FLASH_ATTR httpdConnectCb(void *arg) {
 	connData[i].post->received=0;
 	connData[i].post->len=-1;
 	connData[i].hostName=NULL;
-	connData[i].remote_port=conn->proto.tcp->remote_port;
-	memcpy(connData[i].remote_ip, conn->proto.tcp->remote_ip, 4);
+	connData[i].remote_port=remPort;
+	memcpy(connData[i].remote_ip, remIp, 4);
 
-	espconn_regist_recvcb(conn, httpdRecvCb);
-	espconn_regist_reconcb(conn, httpdReconCb);
-	espconn_regist_disconcb(conn, httpdDisconCb);
-	espconn_regist_sentcb(conn, httpdSentCb);
+	return 1;
 }
 
 //Httpd initialization routine. Call this to kick off webserver functionality.
@@ -589,14 +573,8 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 		connData[i].conn=NULL;
 		connData[i].slot=i;
 	}
-	httpdConn.type=ESPCONN_TCP;
-	httpdConn.state=ESPCONN_NONE;
-	httpdTcp.local_port=port;
-	httpdConn.proto.tcp=&httpdTcp;
 	builtInUrls=fixedUrls;
 
+	httpdPlatInit(port, MAX_CONN);
 	printf("Httpd init\n");
-	espconn_regist_connectcb(&httpdConn, httpdConnectCb);
-	espconn_accept(&httpdConn);
-	espconn_tcp_set_max_con_allow(&httpdConn, MAX_CONN);
 }
