@@ -545,7 +545,7 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 	int i;
 	//Find empty conndata in pool
 	for (i=0; i<MAX_CONN; i++) if (connData[i].conn==NULL) break;
-	printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(&conn->proto.tcp->remote_ip), conn->proto.tcp->remote_port, i);
+	printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(remIp), remPort, i);
 	if (i==MAX_CONN) {
 		printf("Aiee, conn pool overflow!\n");
 		return 0;

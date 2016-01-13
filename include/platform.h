@@ -3,8 +3,9 @@
 
 #ifdef FREERTOS
 //#include "esp_timer.h"
-
 typedef int* ConnTypePtr;
+
+
 #else
 #define printf(...) os_printf(__VA_ARGS__)
 #define sprintf(str, ...) os_sprintf(str, __VA_ARGS__)

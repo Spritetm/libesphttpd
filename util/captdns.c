@@ -1,8 +1,12 @@
 #include <esp8266.h>
 
 //Sorry, non-os only. ToDo: re-frobnicate for FreeRTOS
-#ifndef FREERTOS
+#ifdef FREERTOS
 
+void captdnsInit(void) {
+	printf("CaptDNS not yet supported under FreeRTOS!\n");
+}
+#else
 /*
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
@@ -255,3 +259,4 @@ void ICACHE_FLASH_ATTR captdnsInit(void) {
 }
 
 #endif
+

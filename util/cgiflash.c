@@ -23,9 +23,9 @@ Some flash handling cgi routines. Used for reading the existing flash and updati
 #include "cgiflash.h"
 #include "espfs.h"
 
-#define ESPFS_SIZE 0
-#define FIRMWARE_SIZE 0
-
+#ifndef UPGRADE_FLAG_FINISH
+#define UPGRADE_FLAG_FINISH     0x02
+#endif
 
 // Check that the header of the firmware blob looks like actual firmware...
 static char* ICACHE_FLASH_ATTR checkBinHeader(void *buf) {
