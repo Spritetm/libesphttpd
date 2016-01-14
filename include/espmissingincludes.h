@@ -6,6 +6,8 @@
 #include <ets_sys.h>
 #include <eagle_soc.h>
 
+
+#ifndef FREERTOS
 //Missing function prototypes in include folders. Gcc will warn on these if we don't define 'em anywhere.
 //MOST OF THESE ARE GUESSED! but they seem to swork and shut up the compiler.
 typedef struct espconn espconn;
@@ -26,9 +28,9 @@ size_t ets_strlen(const char *s);
 int ets_strncmp(const char *s1, const char *s2, int len);
 char *ets_strncpy(char *dest, const char *src, size_t n);
 char *ets_strstr(const char *haystack, const char *needle);
-void ets_timer_arm_new(ETSTimer *a, int b, int c, int isMstimer);
-void ets_timer_disarm(ETSTimer *a);
-void ets_timer_setfn(ETSTimer *t, ETSTimerFunc *fn, void *parg);
+void ets_timer_arm_new(os_timer_t *a, int b, int c, int isMstimer);
+void ets_timer_disarm(os_timer_t *a);
+void ets_timer_setfn(os_timer_t *t, ETSTimerFunc *fn, void *parg);
 void ets_update_cpu_frequency(int freqmhz);
 int os_printf(const char *format, ...)  __attribute__ ((format (printf, 1, 2)));
 int os_snprintf(char *str, size_t size, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
@@ -67,6 +69,8 @@ void pvPortFree(void *ptr, const char *file, int line);
                                      &  (~(PERIPHS_IO_MUX_FUNC<<PERIPHS_IO_MUX_FUNC_S)))  \
                                      |( (((FUNC&BIT2)<<2)|(FUNC&0x3))<<PERIPHS_IO_MUX_FUNC_S) );  \
     } while (0)
+#endif
+
 #endif
 
 #endif

@@ -86,7 +86,8 @@ static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(ConnTypePtr conn, char
 		}
 	}
 	//Shouldn't happen.
-	printf("*** Unknown connection " IPSTR ":%d\n", IP2STR(&remIp), remPort);
+	printf("*** Unknown connection %d.%d.%d.%d:%d\n", remIp[0]&0xff, remIp[1]&0xff, remIp[2]&0xff, remIp[3]&0xff, remPort);
+	httpdPlatDisconnect(conn);
 	return NULL;
 }
 
@@ -271,6 +272,7 @@ int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
 //the SoftAP interface. This should preclude clients connected to the STA interface
 //to be redirected to nowhere.
 int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
+#ifndef FREERTOS
 	uint32 *remadr;
 	struct ip_info apip;
 	int x=wifi_get_opmode();
@@ -283,6 +285,9 @@ int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
 	} else {
 		return HTTPD_CGI_NOTFOUND;
 	}
+#else
+	return HTTPD_CGI_NOTFOUND;
+#endif
 }
 
 
@@ -320,6 +325,7 @@ void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) 
 	if (conn->cgi==NULL) { //Marked for destruction?
 		printf("Pool slot %d is done. Closing.\n", conn->slot);
 		httpdPlatDisconnect(conn->conn);
+		conn->conn=NULL;
 		return; //No need to call httpdFlushSendBuffer.
 	}
 
@@ -545,7 +551,7 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 	int i;
 	//Find empty conndata in pool
 	for (i=0; i<MAX_CONN; i++) if (connData[i].conn==NULL) break;
-	printf("Con req from " IPSTR ":%d, pool slot %d\n", IP2STR(remIp), remPort, i);
+	printf("Conn req from  %d.%d.%d.%d:%d, using pool slot %d\n", remIp[0]&0xff, remIp[1]&0xff, remIp[2]&0xff, remIp[3]&0xff, remPort, i);
 	if (i==MAX_CONN) {
 		printf("Aiee, conn pool overflow!\n");
 		return 0;

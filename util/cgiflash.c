@@ -161,7 +161,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 	}
 }
 
-//static ETSTimer flash_reboot_timer;
+//static os_timer_t flash_reboot_timer;
 
 // Handle request to reboot into the new firmware
 int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {

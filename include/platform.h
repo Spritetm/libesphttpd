@@ -3,7 +3,7 @@
 
 #ifdef FREERTOS
 //#include "esp_timer.h"
-typedef int* ConnTypePtr;
+typedef int *ConnTypePtr;
 
 
 #else

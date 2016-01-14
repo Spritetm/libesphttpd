@@ -41,7 +41,7 @@ static ScanResultData cgiWifiAps;
 #define CONNTRY_FAIL 3
 //Connection result var
 static int connTryStatus=CONNTRY_IDLE;
-static ETSTimer resetTimer;
+static os_timer_t resetTimer;
 
 //Callback the code calls when a wlan ap scan is done. Basically stores the result in
 //the cgiWifiAps struct.
@@ -197,7 +197,7 @@ static void ICACHE_FLASH_ATTR reassTimerCb(void *arg) {
 int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 	char essid[128];
 	char passwd[128];
-	static ETSTimer reassTimer;
+	static os_timer_t reassTimer;
 	
 	if (connData->conn==NULL) {
 		//Connection aborted. Clean up.
@@ -248,6 +248,7 @@ int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
 }
 
 int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
+#ifndef FREERTOS
 	char buff[1024];
 	int len;
 	struct ip_info info;
@@ -275,6 +276,7 @@ int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
 	}
 
 	httpdSend(connData, buff, len);
+#endif
 	return HTTPD_CGI_DONE;
 }
 

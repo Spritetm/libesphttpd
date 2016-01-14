@@ -24,7 +24,13 @@ BUILD_BASE	= build
 XTENSA_TOOLS_ROOT ?= 
 
 # base directory of the ESP8266 SDK package, absolute
+# Only used for the non-FreeRTOS build
 SDK_BASE	?= /opt/Espressif/ESP8266_SDK
+
+# Base directory of the ESP8266 FreeRTOS SDK package, absolute
+# Only used for the FreeRTOS build
+SDK_PATH	?= /opt/Espressif/ESP8266_RTOS_SDK
+
 
 # name for the target project
 LIB		= libesphttpd.a
@@ -41,10 +47,28 @@ CFLAGS		= -Os -ggdb -std=c99 -Werror -Wpointer-arith -Wundef -Wall -Wl,-EL -fno-
 		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH \
 		-Wno-address
 
+
+
 # various paths from the SDK used in this project
 SDK_LIBDIR	= lib
 SDK_LDDIR	= ld
+
+
+ifeq ("$(FREERTOS)","yes")
+CFLAGS		+= -DFREERTOS -DLWIP_OPEN_SRC -ffunction-sections -fdata-sections 
+SDK_INCDIR	= include \
+			include/freertos \
+			extra_include \
+			include/lwip \
+			include/lwip/lwip \
+			include/lwip/ipv4 \
+			include/lwip/ipv6
+SDK_INCDIR	:= $(addprefix -I$(SDK_PATH)/,$(SDK_INCDIR))
+else
 SDK_INCDIR	= include
+SDK_INCDIR	:= $(addprefix -I$(SDK_BASE)/,$(SDK_INCDIR))
+endif
+
 
 # select which tools to use as compiler, librarian and linker
 CC		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-gcc
@@ -57,8 +81,6 @@ OBJCOPY	:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-objcopy
 ####
 SRC_DIR		:= $(MODULES)
 BUILD_DIR	:= $(addprefix $(BUILD_BASE)/,$(MODULES))
-
-SDK_INCDIR	:= $(addprefix -I$(SDK_BASE)/,$(SDK_INCDIR))
 
 SRC		:= $(foreach sdir,$(SRC_DIR),$(wildcard $(sdir)/*.c))
 OBJ		:= $(patsubst %.c,$(BUILD_BASE)/%.o,$(SRC))
@@ -76,14 +98,13 @@ Q := @
 vecho := @echo
 endif
 
-ifeq ("$(FREERTOS)","yes")
-CFLAGS		+= -DFREERTOS
-endif
 
+ifneq ("$(FREERTOS)","yes")
 ifeq ("$(USE_OPENSDK)","yes")
 CFLAGS		+= -DUSE_OPENSDK
 else
 CFLAGS		+= -D_STDINT_H
+endif
 endif
 
 ifeq ("$(GZIP_COMPRESSION)","yes")
