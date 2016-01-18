@@ -1,12 +1,3 @@
-#include <esp8266.h>
-
-//Sorry, non-os only. ToDo: re-frobnicate for FreeRTOS
-#ifdef FREERTOS
-
-void captdnsInit(void) {
-	printf("CaptDNS not yet supported under FreeRTOS!\n");
-}
-#else
 /*
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
@@ -24,6 +15,22 @@ be used to send mobile phones, tablets etc which connect to the ESP in AP mode d
 the internal webserver.
 */
 
+#ifndef FREERTOS
+#include <esp8266.h>
+#else
+#include "esp_common.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+
+#include "lwip/sockets.h"
+#include "lwip/err.h"
+static int sockFd;
+#endif
+
+
+#define DNS_LEN 512
 
 typedef struct __attribute__ ((packed)) {
 	uint16_t id;
@@ -102,7 +109,7 @@ static void ICACHE_FLASH_ATTR setn32(void *pp, int32_t n) {
 	*p++=(n&0xff);
 }
 
-static uint16_t ICACHE_FLASH_ATTR ntohs(uint16_t *in) {
+static uint16_t ICACHE_FLASH_ATTR my_ntohs(uint16_t *in) {
 	char *p=(char*)in;
 	return ((p[0]<<8)&0xff00)|(p[1]&0xff);
 }
@@ -127,7 +134,7 @@ static char* ICACHE_FLASH_ATTR labelToStr(char *packet, char *labelPtr, int pack
 		} else if ((*labelPtr&0xC0)==0xC0) {
 			//Compressed label pointer
 			endPtr=labelPtr+2;
-			int offset=ntohs(((uint16_t *)labelPtr))&0x3FFF;
+			int offset=my_ntohs(((uint16_t *)labelPtr))&0x3FFF;
 			//Check if offset points to somewhere outside of the packet
 			if (offset>packetSz) return NULL;
 			labelPtr=&packet[offset];
@@ -163,10 +170,14 @@ static char ICACHE_FLASH_ATTR *strToLabel(char *str, char *label, int maxLen) {
 
 
 //Receive a DNS packet and maybe send a response back
+#ifndef FREERTOS
 static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned short length) {
 	struct espconn *conn=(struct espconn *)arg;
-	char buff[512];
-	char reply[512];
+#else
+static void ICACHE_FLASH_ATTR captdnsRecv(struct sockaddr_in *premote_addr, char *pusrdata, unsigned short length) {
+#endif
+	char buff[DNS_LEN];
+	char reply[DNS_LEN];
 	int i;
 	char *rend=&reply[length];
 	char *p=pusrdata;
@@ -174,23 +185,23 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 	DnsHeader *rhdr=(DnsHeader*)&reply[0];
 	p+=sizeof(DnsHeader);
 //	printf("DNS packet: id 0x%X flags 0x%X rcode 0x%X qcnt %d ancnt %d nscount %d arcount %d len %d\n", 
-//		ntohs(&hdr->id), hdr->flags, hdr->rcode, ntohs(&hdr->qdcount), ntohs(&hdr->ancount), ntohs(&hdr->nscount), ntohs(&hdr->arcount), length);
+//		my_ntohs(&hdr->id), hdr->flags, hdr->rcode, my_ntohs(&hdr->qdcount), my_ntohs(&hdr->ancount), my_ntohs(&hdr->nscount), my_ntohs(&hdr->arcount), length);
 	//Some sanity checks:
-	if (length>512) return; 									//Packet is longer than DNS implementation allows
+	if (length>DNS_LEN) return; 								//Packet is longer than DNS implementation allows
 	if (length<sizeof(DnsHeader)) return; 						//Packet is too short
 	if (hdr->ancount || hdr->nscount || hdr->arcount) return;	//this is a reply, don't know what to do with it
 	if (hdr->flags&FLAG_TC) return;								//truncated, can't use this
 	//Reply is basically the request plus the needed data
 	memcpy(reply, pusrdata, length);
 	rhdr->flags|=FLAG_QR;
-	for (i=0; i<ntohs(&hdr->qdcount); i++) {
+	for (i=0; i<my_ntohs(&hdr->qdcount); i++) {
 		//Grab the labels in the q string
 		p=labelToStr(pusrdata, p, length, buff, sizeof(buff));
 		if (p==NULL) return;
 		DnsQuestionFooter *qf=(DnsQuestionFooter*)p;
 		p+=sizeof(DnsQuestionFooter);
-		printf("DNS: Q (type 0x%X class 0x%X) for %s\n", ntohs(&qf->type), ntohs(&qf->class), buff);
-		if (ntohs(&qf->type)==QTYPE_A) {
+		printf("DNS: Q (type 0x%X class 0x%X) for %s\n", my_ntohs(&qf->type), my_ntohs(&qf->class), buff);
+		if (my_ntohs(&qf->type)==QTYPE_A) {
 			//They want to know the IPv4 address of something.
 			//Build the response.
 			rend=strToLabel(buff, rend, sizeof(reply)-(rend-reply)); //Add the label
@@ -208,9 +219,9 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			*rend++=ip4_addr2(&info.ip);
 			*rend++=ip4_addr3(&info.ip);
 			*rend++=ip4_addr4(&info.ip);
-			setn16(&rhdr->ancount, ntohs(&rhdr->ancount)+1);
+			setn16(&rhdr->ancount, my_ntohs(&rhdr->ancount)+1);
 //			printf("Added A rec to resp. Resp len is %d\n", (rend-reply));
-		} else if (ntohs(&qf->type)==QTYPE_NS) {
+		} else if (my_ntohs(&qf->type)==QTYPE_NS) {
 			//Give ns server. Basically can be whatever we want because it'll get resolved to our IP later anyway.
 			rend=strToLabel(buff, rend, sizeof(reply)-(rend-reply)); //Add the label
 			DnsResourceFooter *rf=(DnsResourceFooter *)rend;
@@ -223,9 +234,9 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			*rend++='n';
 			*rend++='s';
 			*rend++=0;
-			setn16(&rhdr->ancount, ntohs(&rhdr->ancount)+1);
+			setn16(&rhdr->ancount, my_ntohs(&rhdr->ancount)+1);
 //			printf("Added NS rec to resp. Resp len is %d\n", (rend-reply));
-		} else if (ntohs(&qf->type)==QTYPE_URI) {
+		} else if (my_ntohs(&qf->type)==QTYPE_URI) {
 			//Give uri to us
 			rend=strToLabel(buff, rend, sizeof(reply)-(rend-reply)); //Add the label
 			DnsResourceFooter *rf=(DnsResourceFooter *)rend;
@@ -240,13 +251,66 @@ static void ICACHE_FLASH_ATTR captdnsRecv(void* arg, char *pusrdata, unsigned sh
 			setn16(&uh->weight, 1);
 			memcpy(rend, "http://esp.nonet", 16);
 			rend+=16;
-			setn16(&rhdr->ancount, ntohs(&rhdr->ancount)+1);
+			setn16(&rhdr->ancount, my_ntohs(&rhdr->ancount)+1);
 //			printf("Added NS rec to resp. Resp len is %d\n", (rend-reply));
 		}
 	}
 	//Send the response
+#ifndef FREERTOS
 	espconn_sent(conn, (uint8*)reply, rend-reply);
+#else
+	sendto(sock_fd,(uint8*)reply, rend-reply, 0, (struct sockaddr *)premote_addr, sizeof(struct sockaddr_in));
+#endif
 }
+
+#ifdef FREERTOS
+static void captdnsTask(void *pvParameters) {
+	struct sockaddr_in server_addr;
+	int32 ret;
+	struct sockaddr_in from;
+	socklen_t fromlen;
+	struct ip_info ipconfig;
+	char udp_msg[DNS_LEN];
+	
+	memset(&ipconfig, 0, sizeof(ipconfig));
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;	   
+	server_addr.sin_addr.s_addr = INADDR_ANY;
+	server_addr.sin_port = htons(DNS_SERVER_PORT);
+	server_addr.sin_len = sizeof(server_addr);
+	
+	do {
+		sock_fd=socket(AF_INET, SOCK_DGRAM, 0);
+		if (sock_fd==-1) {
+			printf("captdns_task failed to create sock!\n");
+			vTaskDelay(1000/portTICK_RATE_MS);
+		}
+	} while (sock_fd==-1);
+	
+	do {
+		ret=bind(sock_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+		if (ret!=0) {
+			printf("captdns_task failed to bind sock!\n");
+			vTaskDelay(1000/portTICK_RATE_MS);
+		}
+	} while (ret!=0);
+
+	while(1) {
+		memset(&from, 0, sizeof(from));
+		fromlen=sizeof(struct sockaddr_in);
+		ret=recvfrom(sock_fd, (u8 *)udp_msg, DNS_LEN, 0,(struct sockaddr *)&from,(socklen_t *)&fromlen);
+		if (ret>0) captdnsRecv(&from,udp_msg,ret);
+	}
+	
+	close(sock_fd);
+	vTaskDelete(NULL);
+}
+
+void captdnsInit(void) {
+	xTaskCreate(captdnsTask, (const signed char *)"captdns_task", 1200, NULL, 3, NULL);
+}
+
+#else
 
 void ICACHE_FLASH_ATTR captdnsInit(void) {
 	static struct espconn conn;
@@ -259,4 +323,3 @@ void ICACHE_FLASH_ATTR captdnsInit(void) {
 }
 
 #endif
-
