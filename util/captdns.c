@@ -18,7 +18,7 @@ the internal webserver.
 #ifndef FREERTOS
 #include <esp8266.h>
 #else
-#include "esp_common.h"
+#include "espressif/esp_common.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -257,9 +257,14 @@ static void ICACHE_FLASH_ATTR captdnsRecv(struct sockaddr_in *premote_addr, char
 	}
 	//Send the response
 #ifndef FREERTOS
-	espconn_sent(conn, (uint8*)reply, rend-reply);
+	remot_info *remInfo=NULL;
+	if (espconn_get_connection_info(conn, &remInfo, 0)==ESPCONN_OK) {
+		conn->proto.udp->remote_port=remInfo->remote_port;
+		memcpy(conn->proto.udp->remote_ip, remInfo->remote_ip, sizeof(remInfo->remote_ip));
+	}
+	espconn_sendto(conn, (uint8*)reply, rend-reply);
 #else
-	sendto(sock_fd,(uint8*)reply, rend-reply, 0, (struct sockaddr *)premote_addr, sizeof(struct sockaddr_in));
+	sendto(sockFd,(uint8*)reply, rend-reply, 0, (struct sockaddr *)premote_addr, sizeof(struct sockaddr_in));
 #endif
 }
 
@@ -276,33 +281,34 @@ static void captdnsTask(void *pvParameters) {
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;	   
 	server_addr.sin_addr.s_addr = INADDR_ANY;
-	server_addr.sin_port = htons(DNS_SERVER_PORT);
+	server_addr.sin_port = htons(53);
 	server_addr.sin_len = sizeof(server_addr);
 	
 	do {
-		sock_fd=socket(AF_INET, SOCK_DGRAM, 0);
-		if (sock_fd==-1) {
+		sockFd=socket(AF_INET, SOCK_DGRAM, 0);
+		if (sockFd==-1) {
 			printf("captdns_task failed to create sock!\n");
 			vTaskDelay(1000/portTICK_RATE_MS);
 		}
-	} while (sock_fd==-1);
+	} while (sockFd==-1);
 	
 	do {
-		ret=bind(sock_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+		ret=bind(sockFd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (ret!=0) {
 			printf("captdns_task failed to bind sock!\n");
 			vTaskDelay(1000/portTICK_RATE_MS);
 		}
 	} while (ret!=0);
 
+	printf("CaptDNS inited.\n");
 	while(1) {
 		memset(&from, 0, sizeof(from));
 		fromlen=sizeof(struct sockaddr_in);
-		ret=recvfrom(sock_fd, (u8 *)udp_msg, DNS_LEN, 0,(struct sockaddr *)&from,(socklen_t *)&fromlen);
+		ret=recvfrom(sockFd, (u8 *)udp_msg, DNS_LEN, 0,(struct sockaddr *)&from,(socklen_t *)&fromlen);
 		if (ret>0) captdnsRecv(&from,udp_msg,ret);
 	}
 	
-	close(sock_fd);
+	close(sockFd);
 	vTaskDelete(NULL);
 }
 

@@ -248,7 +248,6 @@ int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
 }
 
 int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
-#ifndef FREERTOS
 	char buff[1024];
 	int len;
 	struct ip_info info;
@@ -276,7 +275,6 @@ int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
 	}
 
 	httpdSend(connData, buff, len);
-#endif
 	return HTTPD_CGI_DONE;
 }
 
@@ -309,5 +307,4 @@ int ICACHE_FLASH_ATTR tplWlan(HttpdConnData *connData, char *token, void **arg) 
 	httpdSend(connData, buff, -1);
 	return HTTPD_CGI_DONE;
 }
-
 
