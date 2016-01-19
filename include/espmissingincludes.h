@@ -26,6 +26,7 @@ int ets_strcmp(const char *s1, const char *s2);
 char *ets_strcpy(char *dest, const char *src);
 size_t ets_strlen(const char *s);
 int ets_strncmp(const char *s1, const char *s2, int len);
+int strcasecmp(const char *a, const char *b);
 char *ets_strncpy(char *dest, const char *src, size_t n);
 char *ets_strstr(const char *haystack, const char *needle);
 void ets_timer_arm_new(os_timer_t *a, int b, int c, int isMstimer);
@@ -41,7 +42,6 @@ uint32 system_get_time();
 int rand(void);
 void ets_bzero(void *s, size_t n);
 void ets_delay_us(int ms);
-
 
 //Hack: this is defined in SDK 1.4.0 and undefined in 1.3.0. It's only used for this, the symbol itself
 //has no meaning here.
