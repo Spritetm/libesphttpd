@@ -17,17 +17,29 @@ Esp8266 http server - core routines
 #include "httpd-platform.h"
 
 
-//Max length of request head
-#define MAX_HEAD_LEN 1024
-//Max amount of connections
+//Max amount of simultaneous connections
 #define MAX_CONN 8
-//Max post buffer len
+//Max length of request head. This is statically allocated for each connection.
+#define MAX_HEAD_LEN 1024
+//Max post buffer len. This is dynamically malloc'ed if needed.
 #define MAX_POST 1024
-//Max send buffer len
+//Max send buffer len. This is allocated on the stack.
 #define MAX_SENDBUFF_LEN 2048
+//If some data can't be sent because the underlaying socket doesn't accept the data (like the nonos
+//layer is prone to do), we put it in a backlog that is dynamically malloc'ed. This defines the max
+//size of the backlog.
+#define MAX_BACKLOG_SIZE (4*1024)
 
 //This gets set at init time.
 static HttpdBuiltInUrl *builtInUrls;
+
+typedef struct HttpSendBacklogItem HttpSendBacklogItem;
+
+struct HttpSendBacklogItem {
+	int len;
+	HttpSendBacklogItem *next;
+	char data[];
+};
 
 //Private data for http connection
 struct HttpdPriv {
@@ -35,7 +47,10 @@ struct HttpdPriv {
 	int headPos;
 	char *sendBuff;
 	int sendBuffLen;
+	HttpSendBacklogItem *sendBacklog;
+	int sendBacklogSize;
 };
+
 
 //Connection pool
 static HttpdPriv connPrivData[MAX_CONN];
@@ -91,9 +106,18 @@ static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(ConnTypePtr conn, char
 	return NULL;
 }
 
-
 //Retires a connection for re-use
 static void ICACHE_FLASH_ATTR httpdRetireConn(HttpdConnData *conn) {
+	if (conn->priv->sendBacklog!=NULL) {
+		HttpSendBacklogItem *i, *j;
+		i=conn->priv->sendBacklog;
+		do {
+			j=i;
+			i=i->next;
+			free(j);
+		} while (i!=NULL);
+	}
+	conn->priv->sendBacklogSize=0;
 	if (conn->post->buff!=NULL) free(conn->post->buff);
 	conn->post->buff=NULL;
 	conn->cgi=NULL;
@@ -148,12 +172,12 @@ int ICACHE_FLASH_ATTR httpdFindArg(char *line, char *arg, char *buff, int buffLe
 	if (line==NULL) return -1;
 	p=line;
 	while(p!=NULL && *p!='\n' && *p!='\r' && *p!=0) {
-		printf("findArg: %s\n", p);
+//		printf("findArg: %s\n", p);
 		if (strncmp(p, arg, strlen(arg))==0 && p[strlen(arg)]=='=') {
 			p+=strlen(arg)+1; //move p to start of value
 			e=(char*)strstr(p, "&");
 			if (e==NULL) e=p+strlen(p);
-			printf("findArg: val %s len %d\n", p, (e-p));
+//			printf("findArg: val %s len %d\n", p, (e-p));
 			return httpdUrlDecode(p, (e-p), buff, buffLen);
 		}
 		p=(char*)strstr(p, "&");
@@ -164,6 +188,7 @@ int ICACHE_FLASH_ATTR httpdFindArg(char *line, char *arg, char *buff, int buffLe
 }
 
 //Get the value of a certain header in the HTTP client head
+//Returns true when found, false when not found.
 int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *ret, int retLen) {
 	char *p=conn->priv->head;
 	p=p+strlen(p)+1; //skip GET/POST part
@@ -195,7 +220,9 @@ int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *re
 void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
 	char buff[128];
 	int l;
-	l=sprintf(buff, "HTTP/1.0 %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\n", code);
+	int minor=0;
+	if (code==101) minor=1; //Websockets officially needs 1.1. Advertise 1.0 in all other cases.
+	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\n", minor, code);
 	httpdSend(conn, buff, l);
 }
 
@@ -295,6 +322,7 @@ int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
 //the data is seen as a C-string.
 //Returns 1 for success, 0 for out-of-memory.
 int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) {
+	if (conn->conn==NULL) return 0;
 	if (len<0) len=strlen(data);
 	if (conn->priv->sendBuffLen+len>MAX_SENDBUFF_LEN) return 0;
 	memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
@@ -305,8 +333,34 @@ int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) 
 //Function to send any data in conn->priv->sendBuff. Do not use in CGIs unless you know what you
 //are doing!
 void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
+	int r;
+	if (conn->conn==NULL) return;
 	if (conn->priv->sendBuffLen!=0) {
-		httpdPlatSendData(conn->conn, conn->priv->sendBuff, conn->priv->sendBuffLen);
+		r=httpdPlatSendData(conn->conn, conn->priv->sendBuff, conn->priv->sendBuffLen);
+		if (!r) {
+			//Can't send this for some reason. Dump packet in backlog, we can send it later.
+			if (conn->priv->sendBacklogSize+conn->priv->sendBuffLen>MAX_BACKLOG_SIZE) {
+				printf("Httpd: Backlog: Exceeded max backlog size, dropped %d bytes instead of sending them.\n", conn->priv->sendBuffLen);
+				conn->priv->sendBuffLen=0;
+				return;
+			}
+			HttpSendBacklogItem *i=malloc(sizeof(HttpSendBacklogItem)+conn->priv->sendBuffLen);
+			if (i==NULL) {
+				printf("Httpd: Backlog: malloc failed, out of memory!\n");
+				return;
+			}
+			memcpy(i->data, conn->priv->sendBuff, conn->priv->sendBuffLen);
+			i->len=conn->priv->sendBuffLen;
+			i->next=NULL;
+			if (conn->priv->sendBacklog==NULL) {
+				conn->priv->sendBacklog=i;
+			} else {
+				HttpSendBacklogItem *e=conn->priv->sendBacklog;
+				while (e->next!=NULL) e=e->next;
+				e->next=i;
+			}
+			conn->priv->sendBacklogSize+=conn->priv->sendBuffLen;
+		}
 		conn->priv->sendBuffLen=0;
 	}
 }
@@ -319,13 +373,23 @@ void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) 
 	char sendBuff[MAX_SENDBUFF_LEN];
 
 	if (conn==NULL) return;
+
+	if (conn->priv->sendBacklog!=NULL) {
+		//We have some backlog to send first.
+		HttpSendBacklogItem *next=conn->priv->sendBacklog->next;
+		httpdPlatSendData(conn->conn, conn->priv->sendBacklog->data, conn->priv->sendBacklog->len);
+		conn->priv->sendBacklogSize-=conn->priv->sendBacklog->len;
+		free(conn->priv->sendBacklog);
+		conn->priv->sendBacklog=next;
+		return;
+	}
+
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
 
 	if (conn->cgi==NULL) { //Marked for destruction?
 		printf("Pool slot %d is done. Closing.\n", conn->slot);
 		httpdPlatDisconnect(conn->conn);
-		conn->conn=NULL;
 		return; //No need to call httpdFlushSendBuffer.
 	}
 
@@ -477,7 +541,7 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 
 //Callback called when there's data available on a socket.
 void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsigned short len) {
-	int x;
+	int x, r;
 	char *p, *e;
 	char sendBuff[MAX_SENDBUFF_LEN];
 	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
@@ -494,6 +558,12 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 	for (x=0; x<len; x++) {
 		if (conn->post->len<0) {
 			//This byte is a header byte.
+			if (data[x]=='\n') {
+				//Compatibility with clients that send \n only: fake a \r in front of this.
+				if (conn->priv->headPos!=0 && conn->priv->head[conn->priv->headPos-1]!='\r') {
+					conn->priv->head[conn->priv->headPos++]='\r';
+				}
+			}
 			if (conn->priv->headPos!=MAX_HEAD_LEN) conn->priv->head[conn->priv->headPos++]=data[x];
 			conn->priv->head[conn->priv->headPos]=0;
 			//Scan for /r/n/r/n. Receiving this indicate the headers end.
@@ -531,18 +601,27 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 		} else {
 			//Let cgi handle data if it registered a recvHdl callback. If not, ignore.
 			if (conn->recvHdl) {
-				conn->recvHdl(conn, data+x, len-x);
-				break;
+				r=conn->recvHdl(conn, data+x, len-x);
+				if (r==HTTPD_CGI_DONE) {
+					printf("Recvhdl returned DONE\n");
+					httpdFlushSendBuffer(conn);
+					conn->cgi=NULL; //mark conn for destruction
+					//We assume the recvhdlr has sent something; we'll kill the sock in the sent callback.
+				}
+				break; //ignore rest of data, recvhdl has parsed it.
 			}
 		}
 	}
+	if (conn->conn) httpdFlushSendBuffer(conn);
 }
 
+//The platform layer should ALWAYS call this function, regardless if the connection is closed by the server
+//or by the client.
 void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort) {
-	//The esp sdk passes the handle of the listening socket to us with the
-	//remote ip and port changed for the connection it is referring to.
 	HttpdConnData *hconn=httpdFindConnData(rconn, remIp, remPort);
 	if (hconn==NULL) return;
+	hconn->conn=NULL; //indicate cgi the connection is gone
+	if (hconn->cgi) hconn->cgi(hconn); //Execute cgi fn if needed
 	httpdRetireConn(hconn);
 }
 
@@ -566,6 +645,8 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 	connData[i].post->len=-1;
 	connData[i].hostName=NULL;
 	connData[i].remote_port=remPort;
+	connData[i].priv->sendBacklog=NULL;
+	connData[i].priv->sendBacklogSize=0;
 	memcpy(connData[i].remote_ip, remIp, 4);
 
 	return 1;
