@@ -46,8 +46,10 @@ static void ICACHE_FLASH_ATTR platConnCb(void *arg) {
 }
 
 
-void ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
-	espconn_sent(conn, (uint8_t*)buff, len);
+int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
+	int r;
+	r=espconn_sent(conn, (uint8_t*)buff, len);
+	return (r>=0);
 }
 
 void ICACHE_FLASH_ATTR httpdPlatDisconnect(ConnTypePtr conn) {
