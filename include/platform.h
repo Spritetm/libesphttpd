@@ -3,8 +3,8 @@
 
 #ifdef FREERTOS
 //#include "esp_timer.h"
-typedef int *ConnTypePtr;
-
+typedef struct RtosConnType RtosConnType;
+typedef RtosConnType* ConnTypePtr;
 
 #else
 #define printf(...) os_printf(__VA_ARGS__)

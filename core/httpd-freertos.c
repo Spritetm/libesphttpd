@@ -24,22 +24,26 @@ Thanks to my collague at Espressif for writing the foundations of this code.
 static int httpPort;
 static int httpMaxConnCt;
 
-//ToDo: make these into a struct instead of just 2 arrays.
-static int connfd[MAX_CONN]; //positive if open, -1 if closed
-static int needWriteDoneNotif[MAX_CONN]; //True if a write is done and a sentCb should be done.
+struct  RtosConnType{
+	int fd;
+	int needWriteDoneNotif;
+	int needsClose;
+	int port;
+	char ip[4];
+};
 
-void ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
-	int x=0;
-	for (x=0; x<MAX_CONN; x++) if (connfd[x]==*conn) needWriteDoneNotif[x]=1;
-	write(*conn, buff, len);
+
+//ToDo: make these into a struct instead of just 2 arrays.
+static RtosConnType rconn[MAX_CONN]; //positive if open, -1 if closed
+
+int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
+	conn->needWriteDoneNotif=1;
+	return (write(conn->fd, buff, len)>=0);
 }
 
 void ICACHE_FLASH_ATTR httpdPlatDisconnect(ConnTypePtr conn) {
-	int x=0;
-	close(*conn);
-	for (x=0; x<MAX_CONN; x++) {
-		if (connfd[x]==*conn) connfd[x]=-1;
-	}
+	conn->needsClose=1;
+	conn->needWriteDoneNotif=1; //because the real close is done in the writable select code
 }
 
 #define RECV_BUF_SIZE 2048
@@ -56,7 +60,9 @@ static void platHttpServerTask(void *pvParameters) {
 	struct sockaddr_in server_addr;
 	struct sockaddr_in remote_addr;
 
-	for (x=0; x<MAX_CONN; x++) connfd[x]=-1;
+	for (x=0; x<MAX_CONN; x++) {
+		rconn[x].fd=-1;
+	}
 
 	char *precvbuf = (char*)malloc(RECV_BUF_SIZE);
 	if(precvbuf==NULL) printf("platHttpServerTask: memory exhausted!\n");
@@ -94,7 +100,7 @@ static void platHttpServerTask(void *pvParameters) {
 			vTaskDelay(1000/portTICK_RATE_MS);
 		}
 		
-	}while(ret != 0);
+	} while(ret != 0);
 	
 	printf("esphttpd: active and listening to connections.\n");
 	while(1){
@@ -106,13 +112,11 @@ static void platHttpServerTask(void *pvParameters) {
 		//timeout.tv_sec = 2;
 		//timeout.tv_usec = 0;
 		
-
-		//
 		for(x=0; x<MAX_CONN; x++){
-			if (connfd[x]!=-1) {
-				FD_SET(connfd[x], &readset);
-				if (needWriteDoneNotif[x]) FD_SET(connfd[x], &writeset);
-				if (connfd[x]>maxfdp) maxfdp=connfd[x];
+			if (rconn[x].fd!=-1) {
+				FD_SET(rconn[x].fd, &readset);
+				if (rconn[x].needWriteDoneNotif) FD_SET(rconn[x].fd, &writeset);
+				if (rconn[x].fd>maxfdp) maxfdp=rconn[x].fd;
 			} else {
 				socketsFull=0;
 			}
@@ -134,7 +138,7 @@ static void platHttpServerTask(void *pvParameters) {
 					printf("platHttpServerTask: Huh? Accept failed.\n");
 					continue;
 				}
-				for(x=0; x<MAX_CONN; x++) if (connfd[x]==-1) break;
+				for(x=0; x<MAX_CONN; x++) if (rconn[x].fd==-1) break;
 				if (x==MAX_CONN) {
 					printf("platHttpServerTask: Huh? Got accept with all slots full.\n");
 					continue;
@@ -149,51 +153,56 @@ static void platHttpServerTask(void *pvParameters) {
 				setsockopt(remotefd, IPPROTO_TCP, TCP_KEEPINTVL, (void *)&keepInterval, sizeof(keepInterval));
 				setsockopt(remotefd, IPPROTO_TCP, TCP_KEEPCNT, (void *)&keepCount, sizeof(keepCount));
 				
-				connfd[x]=remotefd;
-				needWriteDoneNotif[x]=0;
+				rconn[x].fd=remotefd;
+				rconn[x].needWriteDoneNotif=0;
+				rconn[x].needsClose=0;
 				
 				len=sizeof(name);
 				getpeername(remotefd, &name, (socklen_t *)&len);
 				struct sockaddr_in *piname=(struct sockaddr_in *)&name;
-				httpdConnectCb(&connfd[x], (char*)&piname->sin_addr.s_addr, piname->sin_port);
+
+				rconn[x].port=piname->sin_port;
+				memcpy(&rconn[x].ip, &piname->sin_addr.s_addr, sizeof(rconn[x].ip));
+
+				httpdConnectCb(&rconn[x], rconn[x].ip, rconn[x].port);
 				//os_timer_disarm(&connData[x].conn->stop_watch);
 				//os_timer_setfn(&connData[x].conn->stop_watch, (os_timer_func_t *)httpserver_conn_watcher, connData[x].conn);
 				//os_timer_arm(&connData[x].conn->stop_watch, STOP_TIMER, 0);
-				printf("httpserver acpt index %d sockfd %d!\n", x, remotefd);
+//				printf("httpserver acpt index %d sockfd %d!\n", x, remotefd);
 			}
 			
 			//See if anything happened on the existing connections.
 			for(x=0; x < MAX_CONN; x++){
 				//Skip empty slots
-				if (connfd[x]==-1) continue;
+				if (rconn[x].fd==-1) continue;
 
-				//Grab remote ip/port
-				struct sockaddr_in *piname;
-				len=sizeof(name);
-				getpeername(connfd[x], &name, (socklen_t *)&len);
-				piname=(struct sockaddr_in *)&name;
-				
+				//Check for write availability first: the read routines may write needWriteDoneNotif while
+				//the select didn't check for that.
+				if (rconn[x].needWriteDoneNotif && FD_ISSET(rconn[x].fd, &writeset)) {
+					rconn[x].needWriteDoneNotif=0; //Do this first, httpdSentCb may write something making this 1 again.
+					if (rconn[x].needsClose) {
+						//Do callback and close fd.
+						httpdDisconCb(&rconn[x], rconn[x].ip, rconn[x].port);
+						close(rconn[x].fd);
+						rconn[x].fd=-1;
+					} else {
+						httpdSentCb(&rconn[x], rconn[x].ip, rconn[x].port);
+					}
+				}
 
-
-				if (FD_ISSET(connfd[x], &readset)){
-					ret=recv(connfd[x], precvbuf, RECV_BUF_SIZE,0);
+				if (FD_ISSET(rconn[x].fd, &readset)) {
+					ret=recv(rconn[x].fd, precvbuf, RECV_BUF_SIZE,0);
 					if(ret > 0){
-						printf("httpserver recv index %d sockfd %d len %d!\n", x, connfd[x], ret);
 						//Data received. Pass to httpd.
-						httpdRecvCb(&connfd[x], (char*)&piname->sin_addr.s_addr, piname->sin_port, precvbuf, ret);
+						httpdRecvCb(&rconn[x], rconn[x].ip, rconn[x].port, precvbuf, ret);
 					}else{
 						//recv error,connection close
-						printf("httpserver close index %d sockfd %d!\n", x, connfd[x]);
-						httpdDisconCb(&connfd[x], (char*)&piname->sin_addr.s_addr, piname->sin_port);
-						close(connfd[x]);
-						connfd[x]=-1;
+						httpdDisconCb(&rconn[x], rconn[x].ip, rconn[x].port);
+						close(rconn[x].fd);
+						rconn[x].fd=-1;
 					}
 				}
 				
-				if (needWriteDoneNotif[x] && FD_ISSET(connfd[x], &writeset)){
-					needWriteDoneNotif[x]=0; //Do this first, httpdSentCb may write something making this 1 again.
-					httpdSentCb(&connfd[x], (char*)&piname->sin_addr.s_addr, piname->sin_port);
-				}
 			}
 		}
 	}
