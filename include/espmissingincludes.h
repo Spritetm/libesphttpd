@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 #include <c_types.h>
-#include <ets_sys.h>
-#include <eagle_soc.h>
 
 
 int strcasecmp(const char *a, const char *b);
 #ifndef FREERTOS
+#include <eagle_soc.h>
+#include <ets_sys.h>
 //Missing function prototypes in include folders. Gcc will warn on these if we don't define 'em anywhere.
 //MOST OF THESE ARE GUESSED! but they seem to swork and shut up the compiler.
 typedef struct espconn espconn;

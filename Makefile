@@ -58,6 +58,8 @@ ifeq ("$(FREERTOS)","yes")
 CFLAGS		+= -DFREERTOS -DLWIP_OPEN_SRC -ffunction-sections -fdata-sections 
 SDK_INCDIR	= include \
 			include/freertos \
+			include/espressif/esp8266 \
+			include/espressif \
 			extra_include \
 			include/lwip \
 			include/lwip/lwip \

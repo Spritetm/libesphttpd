@@ -15,11 +15,10 @@ Some flash handling cgi routines. Used for reading the existing flash and updati
 #include <esp8266.h>
 #include "cgiflash.h"
 #include "espfs.h"
-#include <osapi.h>
 #include "cgiflash.h"
 #include "espfs.h"
 
-#include <osapi.h>
+//#include <osapi.h>
 #include "cgiflash.h"
 #include "espfs.h"
 
