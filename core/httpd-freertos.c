@@ -32,7 +32,6 @@ struct  RtosConnType{
 	char ip[4];
 };
 
-
 static RtosConnType rconn[MAX_CONN];
 
 int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
