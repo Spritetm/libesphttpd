@@ -52,6 +52,7 @@ static void platHttpServerTask(void *pvParameters) {
 	int32 ret;
 	int x;
 	int maxfdp = 0;
+	char *precvbuf;
 	fd_set readset,writeset;
 	struct sockaddr name;
 	//struct timeval timeout;
@@ -61,9 +62,6 @@ static void platHttpServerTask(void *pvParameters) {
 	for (x=0; x<MAX_CONN; x++) {
 		rconn[x].fd=-1;
 	}
-
-	char *precvbuf = (char*)malloc(RECV_BUF_SIZE);
-	if(precvbuf==NULL) printf("platHttpServerTask: memory exhausted!\n");
 	
 	/* Construct local address structure */
 	memset(&server_addr, 0, sizeof(server_addr)); /* Zero out structure */
@@ -189,18 +187,20 @@ static void platHttpServerTask(void *pvParameters) {
 				}
 
 				if (FD_ISSET(rconn[x].fd, &readset)) {
+					precvbuf=(char*)malloc(RECV_BUF_SIZE);
+					if (precvbuf==NULL) printf("platHttpServerTask: memory exhausted!\n");
 					ret=recv(rconn[x].fd, precvbuf, RECV_BUF_SIZE,0);
-					if(ret > 0){
+					if (ret > 0) {
 						//Data received. Pass to httpd.
 						httpdRecvCb(&rconn[x], rconn[x].ip, rconn[x].port, precvbuf, ret);
-					}else{
+					} else {
 						//recv error,connection close
 						httpdDisconCb(&rconn[x], rconn[x].ip, rconn[x].port);
 						close(rconn[x].fd);
 						rconn[x].fd=-1;
 					}
+					if (precvbuf) free(precvbuf);
 				}
-				
 			}
 		}
 	}
@@ -223,9 +223,6 @@ static void platHttpServerTask(void *pvParameters) {
 	/*release listen socket*/
 	close(listenfd);
 
-	if(NULL != precvbuf){
-		free(precvbuf);
-	}
 	vTaskDelete(NULL);
 #endif
 }
@@ -236,7 +233,7 @@ static void platHttpServerTask(void *pvParameters) {
 void ICACHE_FLASH_ATTR httpdPlatInit(int port, int maxConnCt) {
 	httpPort=port;
 	httpMaxConnCt=maxConnCt;
-	xTaskCreate(platHttpServerTask, (const signed char *)"esphttpd", 3*1024, NULL, 4, NULL);
+	xTaskCreate(platHttpServerTask, (const signed char *)"esphttpd", 1124, NULL, 4, NULL);
 }
 
 

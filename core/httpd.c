@@ -219,17 +219,18 @@ int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *re
 
 //Start the response headers.
 void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
-	char buff[128];
+	static const char ICACHE_RODATA_ATTR respStart[]="HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\n";
+	char buff[sizeof(respStart)+10];
 	int l;
 	int minor=0;
 	if (code==101) minor=1; //Websockets officially needs 1.1. Advertise 1.0 in all other cases.
-	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\n", minor, code);
+	l=sprintf(buff, respStart, minor, code);
 	httpdSend(conn, buff, l);
 }
 
 //Send a http header.
 void ICACHE_FLASH_ATTR httpdHeader(HttpdConnData *conn, const char *field, const char *val) {
-	char buff[256];
+	char buff[128];
 	int l;
 
 	l=sprintf(buff, "%s: %s\r\n", field, val);
@@ -372,7 +373,7 @@ void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
 void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) {
 	int r;
 	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
-	char sendBuff[MAX_SENDBUFF_LEN];
+	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
 
 	if (conn==NULL) return;
 
@@ -404,9 +405,10 @@ void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) 
 		conn->cgi=NULL; //mark for destruction.
 	}
 	httpdFlushSendBuffer(conn);
+	free(sendBuff);
 }
 
-static const char *httpNotFoundHeader="HTTP/1.0 404 Not Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nNot Found.\r\n";
+static const ICACHE_RODATA_ATTR char httpNotFoundHeader[]="HTTP/1.0 404 Not Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nNot Found.\r\n";
 
 //This is called when the headers have been received and the connection is ready to send
 //the result headers and data.
