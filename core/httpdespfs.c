@@ -125,7 +125,7 @@ int ICACHE_FLASH_ATTR cgiEspFsTemplate(HttpdConnData *connData) {
 			return HTTPD_CGI_NOTFOUND;
 		}
 		if (espFsFlags(tpd->file) & FLAG_GZIP) {
-			printf("cgiEspFsTemplate: Trying to use gzip-compressed file %s as template!\n", connData->url);
+			httpd_printf("cgiEspFsTemplate: Trying to use gzip-compressed file %s as template!\n", connData->url);
 			espFsClose(tpd->file);
 			free(tpd);
 			return HTTPD_CGI_NOTFOUND;

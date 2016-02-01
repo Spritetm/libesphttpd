@@ -74,7 +74,7 @@ static void platHttpServerTask(void *pvParameters) {
 	do{
 		listenfd = socket(AF_INET, SOCK_STREAM, 0);
 		if (listenfd == -1) {
-			printf("platHttpServerTask: failed to create sock!\n");
+			httpd_printf("platHttpServerTask: failed to create sock!\n");
 			vTaskDelay(1000/portTICK_RATE_MS);
 		}
 	} while(listenfd == -1);
@@ -83,7 +83,7 @@ static void platHttpServerTask(void *pvParameters) {
 	do{
 		ret = bind(listenfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (ret != 0) {
-			printf("platHttpServerTask: failed to bind!\n");
+			httpd_printf("platHttpServerTask: failed to bind!\n");
 			vTaskDelay(1000/portTICK_RATE_MS);
 		}
 	} while(ret != 0);
@@ -92,13 +92,13 @@ static void platHttpServerTask(void *pvParameters) {
 		/* Listen to the local connection */
 		ret = listen(listenfd, MAX_CONN);
 		if (ret != 0) {
-			printf("platHttpServerTask: failed to listen!\n");
+			httpd_printf("platHttpServerTask: failed to listen!\n");
 			vTaskDelay(1000/portTICK_RATE_MS);
 		}
 		
 	} while(ret != 0);
 	
-	printf("esphttpd: active and listening to connections.\n");
+	httpd_printf("esphttpd: active and listening to connections.\n");
 	while(1){
 		// clear fdset, and set the select function wait time
 		int socketsFull=1;
@@ -131,12 +131,12 @@ static void platHttpServerTask(void *pvParameters) {
 				len=sizeof(struct sockaddr_in);
 				remotefd = accept(listenfd, (struct sockaddr *)&remote_addr, (socklen_t *)&len);
 				if (remotefd<0) {
-					printf("platHttpServerTask: Huh? Accept failed.\n");
+					httpd_printf("platHttpServerTask: Huh? Accept failed.\n");
 					continue;
 				}
 				for(x=0; x<MAX_CONN; x++) if (rconn[x].fd==-1) break;
 				if (x==MAX_CONN) {
-					printf("platHttpServerTask: Huh? Got accept with all slots full.\n");
+					httpd_printf("platHttpServerTask: Huh? Got accept with all slots full.\n");
 					continue;
 				}
 				int keepAlive = 1; //enable keepalive
@@ -164,7 +164,7 @@ static void platHttpServerTask(void *pvParameters) {
 				//os_timer_disarm(&connData[x].conn->stop_watch);
 				//os_timer_setfn(&connData[x].conn->stop_watch, (os_timer_func_t *)httpserver_conn_watcher, connData[x].conn);
 				//os_timer_arm(&connData[x].conn->stop_watch, STOP_TIMER, 0);
-//				printf("httpserver acpt index %d sockfd %d!\n", x, remotefd);
+//				httpd_printf("httpserver acpt index %d sockfd %d!\n", x, remotefd);
 			}
 			
 			//See if anything happened on the existing connections.
@@ -188,7 +188,7 @@ static void platHttpServerTask(void *pvParameters) {
 
 				if (FD_ISSET(rconn[x].fd, &readset)) {
 					precvbuf=(char*)malloc(RECV_BUF_SIZE);
-					if (precvbuf==NULL) printf("platHttpServerTask: memory exhausted!\n");
+					if (precvbuf==NULL) httpd_printf("platHttpServerTask: memory exhausted!\n");
 					ret=recv(rconn[x].fd, precvbuf, RECV_BUF_SIZE,0);
 					if (ret > 0) {
 						//Data received. Pass to httpd.

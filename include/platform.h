@@ -5,7 +5,10 @@
 //#include "esp_timer.h"
 typedef struct RtosConnType RtosConnType;
 typedef RtosConnType* ConnTypePtr;
-
+#define httpd_printf(fmt, ...) do {	\
+	static const char flash_str[] ICACHE_RODATA_ATTR STORE_ATTR = fmt;	\
+	printf(flash_str, ##__VA_ARGS__);	\
+	} while(0)
 #else
 #define printf(...) os_printf(__VA_ARGS__)
 #define sprintf(str, ...) os_sprintf(str, __VA_ARGS__)
@@ -22,6 +25,7 @@ typedef RtosConnType* ConnTypePtr;
 #define strlen(a) os_strlen(a)
 #define memcmp(a, b, c) os_memcmp(a, b, c)
 typedef struct espconn* ConnTypePtr;
+#define httpdprintf(format, ...) os_printf(format, __VA_ARGS__)
 #endif
 
 

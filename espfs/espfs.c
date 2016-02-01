@@ -107,7 +107,7 @@ void ICACHE_FLASH_ATTR readFlashUnaligned(char *dst, char *src, int len) {
 // Returns flags of opened file.
 int ICACHE_FLASH_ATTR espFsFlags(EspFsFile *fh) {
 	if (fh == NULL) {
-		printf("File handle not ready\n");
+		httpd_printf("File handle not ready\n");
 		return -1;
 	}
 
@@ -119,7 +119,7 @@ int ICACHE_FLASH_ATTR espFsFlags(EspFsFile *fh) {
 //Open a file and return a pointer to the file desc struct.
 EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 	if (espFsData == NULL) {
-		printf("Call espFsInit first!\n");
+		httpd_printf("Call espFsInit first!\n");
 		return NULL;
 	}
 	char *p=espFsData;
@@ -136,23 +136,23 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 		spi_flash_read((uint32)p, (uint32*)&h, sizeof(EspFsHeader));
 
 		if (h.magic!=ESPFS_MAGIC) {
-			printf("Magic mismatch. EspFS image broken.\n");
+			httpd_printf("Magic mismatch. EspFS image broken.\n");
 			return NULL;
 		}
 		if (h.flags&FLAG_LASTFILE) {
-			printf("End of image.\n");
+			httpd_printf("End of image.\n");
 			return NULL;
 		}
 		//Grab the name of the file.
 		p+=sizeof(EspFsHeader); 
 		spi_flash_read((uint32)p, (uint32*)&namebuf, sizeof(namebuf));
-//		printf("Found file '%s'. Namelen=%x fileLenComp=%x, compr=%d flags=%d\n", 
+//		httpd_printf("Found file '%s'. Namelen=%x fileLenComp=%x, compr=%d flags=%d\n", 
 //				namebuf, (unsigned int)h.nameLen, (unsigned int)h.fileLenComp, h.compression, h.flags);
 		if (strcmp(namebuf, fileName)==0) {
 			//Yay, this is the file we need!
 			p+=h.nameLen; //Skip to content.
 			r=(EspFsFile *)malloc(sizeof(EspFsFile)); //Alloc file desc mem
-//			printf("Alloc %p\n", r);
+//			httpd_printf("Alloc %p\n", r);
 			if (r==NULL) return NULL;
 			r->header=(EspFsHeader *)hpos;
 			r->decompressor=h.compression;
@@ -169,12 +169,12 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 				//Decoder params are stored in 1st byte.
 				readFlashUnaligned(&parm, r->posComp, 1);
 				r->posComp++;
-				printf("Heatshrink compressed file; decode parms = %x\n", parm);
+				httpd_printf("Heatshrink compressed file; decode parms = %x\n", parm);
 				dec=heatshrink_decoder_alloc(16, (parm>>4)&0xf, parm&0xf);
 				r->decompData=dec;
 #endif
 			} else {
-				printf("Invalid compression: %d\n", h.compression);
+				httpd_printf("Invalid compression: %d\n", h.compression);
 				return NULL;
 			}
 			return r;
@@ -197,11 +197,11 @@ int ICACHE_FLASH_ATTR espFsRead(EspFsFile *fh, char *buff, int len) {
 		int toRead;
 		toRead=flen-(fh->posComp-fh->posStart);
 		if (len>toRead) len=toRead;
-//		printf("Reading %d bytes from %x\n", len, (unsigned int)fh->posComp);
+//		httpd_printf("Reading %d bytes from %x\n", len, (unsigned int)fh->posComp);
 		readFlashUnaligned(buff, fh->posComp, len);
 		fh->posDecomp+=len;
 		fh->posComp+=len;
-//		printf("Done reading %d bytes, pos=%x\n", len, fh->posComp);
+//		httpd_printf("Done reading %d bytes, pos=%x\n", len, fh->posComp);
 		return len;
 #ifdef ESPFS_HEATSHRINK
 	} else if (fh->decompressor==COMPRESS_HEATSHRINK) {
@@ -210,7 +210,7 @@ int ICACHE_FLASH_ATTR espFsRead(EspFsFile *fh, char *buff, int len) {
 		size_t elen, rlen;
 		char ebuff[16];
 		heatshrink_decoder *dec=(heatshrink_decoder *)fh->decompData;
-//		printf("Alloc %p\n", dec);
+//		httpd_printf("Alloc %p\n", dec);
 		if (fh->posDecomp == fdlen) {
 			return 0;
 		}
@@ -234,11 +234,11 @@ int ICACHE_FLASH_ATTR espFsRead(EspFsFile *fh, char *buff, int len) {
 			buff+=rlen;
 			decoded+=rlen;
 
-//			printf("Elen %d rlen %d d %d pd %ld fdl %d\n",elen,rlen,decoded, fh->posDecomp, fdlen);
+//			httpd_printf("Elen %d rlen %d d %d pd %ld fdl %d\n",elen,rlen,decoded, fh->posDecomp, fdlen);
 
 			if (elen == 0) {
 				if (fh->posDecomp == fdlen) {
-//					printf("Decoder finish\n");
+//					httpd_printf("Decoder finish\n");
 					heatshrink_decoder_finish(dec);
 				}
 				return decoded;
@@ -257,10 +257,10 @@ void ICACHE_FLASH_ATTR espFsClose(EspFsFile *fh) {
 	if (fh->decompressor==COMPRESS_HEATSHRINK) {
 		heatshrink_decoder *dec=(heatshrink_decoder *)fh->decompData;
 		heatshrink_decoder_free(dec);
-//		printf("Freed %p\n", dec);
+//		httpd_printf("Freed %p\n", dec);
 	}
 #endif
-//	printf("Freed %p\n", fh);
+//	httpd_printf("Freed %p\n", fh);
 	free(fh);
 }
 

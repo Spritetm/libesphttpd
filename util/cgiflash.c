@@ -55,7 +55,7 @@ int ICACHE_FLASH_ATTR cgiGetFirmwareNext(HttpdConnData *connData) {
 	httpdEndHeaders(connData);
 	char *next = id == 1 ? "user1.bin" : "user2.bin";
 	httpdSend(connData, next, -1);
-	printf("Next firmware: %s (got %d)\n", next, id);
+	httpd_printf("Next firmware: %s (got %d)\n", next, id);
 	return HTTPD_CGI_DONE;
 }
 
@@ -70,7 +70,7 @@ int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 	}
 
 	if (*pos==0) {
-		printf("Start flash download.\n");
+		httpd_printf("Start flash download.\n");
 		httpdStartResponse(connData, 200);
 		httpdHeader(connData, "Content-Type", "application/bin");
 		httpdEndHeaders(connData);
@@ -109,7 +109,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 	if (def==NULL) err="Flash def = NULL ?";
 
 	// check overall size
-	printf("Max img sz 0x%X, post len 0x%X\n", def->fwSize, connData->post->len);
+	httpd_printf("Max img sz 0x%X, post len 0x%X\n", def->fwSize, connData->post->len);
 	if (err==NULL && connData->post->len > def->fwSize) err = "Firmware image too large";
 
 	// check that data starts with an appropriate header
@@ -124,7 +124,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 
 	// return an error if there is one
 	if (err != NULL) {
-		printf("Error %d: %s\n", code, err);
+		httpd_printf("Error %d: %s\n", code, err);
 		httpdStartResponse(connData, code);
 		httpdHeader(connData, "Content-Type", "text/plain");
 		httpdEndHeaders(connData);
@@ -142,12 +142,12 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 	// erase next flash block if necessary
 	if (address % SPI_FLASH_SEC_SIZE == 0){
 		// We need to erase this block
-		printf("Erasing flash at 0x%05x (id=%d)\n", (unsigned int)address, 2-id);
+		httpd_printf("Erasing flash at 0x%05x (id=%d)\n", (unsigned int)address, 2-id);
 		spi_flash_erase_sector(address/SPI_FLASH_SEC_SIZE);
 	}
 
 	// Write the data
-	printf("Writing %d bytes at 0x%05x (%d of %d)\n", connData->post->buffSize, (unsigned int)address,
+	httpd_printf("Writing %d bytes at 0x%05x (%d of %d)\n", connData->post->buffSize, (unsigned int)address,
 			connData->post->received, connData->post->len);
 	spi_flash_write(address, (uint32 *)connData->post->buff, connData->post->buffLen);
 
