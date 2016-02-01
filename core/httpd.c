@@ -230,11 +230,10 @@ void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
 
 //Send a http header.
 void ICACHE_FLASH_ATTR httpdHeader(HttpdConnData *conn, const char *field, const char *val) {
-	char buff[128];
-	int l;
-
-	l=sprintf(buff, "%s: %s\r\n", field, val);
-	httpdSend(conn, buff, l);
+	httpdSend(conn, field, -1);
+	httpdSend(conn, ": ", -1);
+	httpdSend(conn, val, -1);
+	httpdSend(conn, "\r\n", -1);
 }
 
 //Finish the headers.
@@ -246,10 +245,11 @@ void ICACHE_FLASH_ATTR httpdEndHeaders(HttpdConnData *conn) {
 //Redirect to the given URL.
 void ICACHE_FLASH_ATTR httpdRedirect(HttpdConnData *conn, char *newUrl) {
 	static const char ICACHE_RODATA_ATTR redirectHeader[]="HTTP/1.1 302 Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nLocation: %s\r\n\r\nMoved to %s\r\n";
-	char buff[1024];
+	char *buff=malloc(sizeof(redirectHeader)+strlen(newUrl)*2);
 	int l;
 	l=sprintf(buff, redirectHeader, newUrl, newUrl);
 	httpdSend(conn, buff, l);
+	free(buff);
 }
 
 //Use this as a cgi function to redirect one url to another.
@@ -268,7 +268,8 @@ int ICACHE_FLASH_ATTR cgiRedirect(HttpdConnData *connData) {
 //this will also redirect connections when the ESP is in STA mode, potentially to a hostname that is not
 //in the 'official' DNS and so will fail.
 int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
-	char buff[1024];
+	static const char ICACHE_RODATA_ATTR hostFmt[]="http://%s/";
+	char *buff;
 	int isIP=0;
 	int x;
 	if (connData->conn==NULL) {
@@ -291,9 +292,11 @@ int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
 	//Check hostname; pass on if the same
 	if (strcmp(connData->hostName, (char*)connData->cgiArg)==0) return HTTPD_CGI_NOTFOUND;
 	//Not the same. Redirect to real hostname.
-	sprintf(buff, "http://%s/", (char*)connData->cgiArg);
+	buff=malloc(strlen((char*)connData->cgiArg)+sizeof(hostFmt));
+	sprintf(buff, hostFmt, (char*)connData->cgiArg);
 	httpd_printf("Redirecting to hostname url %s\n", buff);
 	httpdRedirect(connData, buff);
+	free(buff);
 	return HTTPD_CGI_DONE;
 }
 
