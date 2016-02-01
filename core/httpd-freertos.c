@@ -33,8 +33,7 @@ struct  RtosConnType{
 };
 
 
-//ToDo: make these into a struct instead of just 2 arrays.
-static RtosConnType rconn[MAX_CONN]; //positive if open, -1 if closed
+static RtosConnType rconn[MAX_CONN];
 
 int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
 	conn->needWriteDoneNotif=1;

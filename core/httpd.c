@@ -53,9 +53,7 @@ struct HttpdPriv {
 
 
 //Connection pool
-static HttpdPriv connPrivData[MAX_CONN];
-static HttpdConnData connData[MAX_CONN];
-static HttpdPostData connPostData[MAX_CONN];
+static HttpdConnData *connData[MAX_CONN];
 
 //Struct to keep extension->mime data in
 typedef struct {
@@ -63,9 +61,12 @@ typedef struct {
 	const char *mimetype;
 } MimeMap;
 
+
+//#define RSTR(a) ((const char)(a))
+
 //The mappings from file extensions to mime types. If you need an extra mime type,
 //add it here.
-static const MimeMap mimeTypes[]={
+static const ICACHE_RODATA_ATTR MimeMap mimeTypes[]={
 	{"htm", "text/htm"},
 	{"html", "text/html"},
 	{"css", "text/css"},
@@ -94,10 +95,10 @@ const char ICACHE_FLASH_ATTR *httpdGetMimetype(char *url) {
 //Looks up the connData info for a specific connection
 static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(ConnTypePtr conn, char *remIp, int remPort) {
 	for (int i=0; i<MAX_CONN; i++) {
-		if (connData[i].remote_port == remPort &&
-						memcmp(connData[i].remote_ip, remIp, 4) == 0) {
-			connData[i].conn=conn;
-			return &connData[i];
+		if (connData[i] && connData[i]->remote_port == remPort &&
+						memcmp(connData[i]->remote_ip, remIp, 4) == 0) {
+			connData[i]->conn=conn;
+			return connData[i];
 		}
 	}
 	//Shouldn't happen.
@@ -117,13 +118,13 @@ static void ICACHE_FLASH_ATTR httpdRetireConn(HttpdConnData *conn) {
 			free(j);
 		} while (i!=NULL);
 	}
-	conn->priv->sendBacklogSize=0;
 	if (conn->post->buff!=NULL) free(conn->post->buff);
-	conn->post->buff=NULL;
-	conn->cgi=NULL;
-	conn->conn=NULL;
-	conn->remote_port=0;
-	memset(conn->remote_ip, 0, 4);
+	if (conn->post!=NULL) free(conn->post);
+	if (conn->priv!=NULL) free(conn->priv);
+	if (conn) free(conn);
+	for (int i=0; i<MAX_CONN; i++) {
+		if (connData[i]==conn) connData[i]=NULL;
+	}
 }
 
 //Stupid li'l helper function that returns the value of a hex char.
@@ -243,9 +244,10 @@ void ICACHE_FLASH_ATTR httpdEndHeaders(HttpdConnData *conn) {
 //ToDo: sprintf->snprintf everywhere... esp doesn't have snprintf tho' :/
 //Redirect to the given URL.
 void ICACHE_FLASH_ATTR httpdRedirect(HttpdConnData *conn, char *newUrl) {
+	static const char ICACHE_RODATA_ATTR redirectHeader[]="HTTP/1.1 302 Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nLocation: %s\r\n\r\nMoved to %s\r\n";
 	char buff[1024];
 	int l;
-	l=sprintf(buff, "HTTP/1.1 302 Found\r\nServer: esp8266-httpd/"HTTPDVER"\r\nConnection: close\r\nLocation: %s\r\n\r\nMoved to %s\r\n", newUrl, newUrl);
+	l=sprintf(buff, redirectHeader, newUrl, newUrl);
 	httpdSend(conn, buff, l);
 }
 
@@ -629,25 +631,30 @@ void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort
 int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort) {
 	int i;
 	//Find empty conndata in pool
-	for (i=0; i<MAX_CONN; i++) if (connData[i].conn==NULL) break;
+	for (i=0; i<MAX_CONN; i++) if (connData[i]==NULL) break;
 	printf("Conn req from  %d.%d.%d.%d:%d, using pool slot %d\n", remIp[0]&0xff, remIp[1]&0xff, remIp[2]&0xff, remIp[3]&0xff, remPort, i);
 	if (i==MAX_CONN) {
 		printf("Aiee, conn pool overflow!\n");
 		return 0;
 	}
-	connData[i].priv=&connPrivData[i];
-	connData[i].conn=conn;
-	connData[i].priv->headPos=0;
-	connData[i].post=&connPostData[i];
-	connData[i].post->buff=NULL;
-	connData[i].post->buffLen=0;
-	connData[i].post->received=0;
-	connData[i].post->len=-1;
-	connData[i].hostName=NULL;
-	connData[i].remote_port=remPort;
-	connData[i].priv->sendBacklog=NULL;
-	connData[i].priv->sendBacklogSize=0;
-	memcpy(connData[i].remote_ip, remIp, 4);
+	connData[i]=malloc(sizeof(HttpdConnData));
+	memset(connData[i], 0, sizeof(HttpdConnData));
+	connData[i]->priv=malloc(sizeof(HttpdPriv));
+	memset(connData[i]->priv, 0, sizeof(HttpdPriv));
+	connData[i]->conn=conn;
+	connData[i]->slot=i;
+	connData[i]->priv->headPos=0;
+	connData[i]->post=malloc(sizeof(HttpdPostData));
+	memset(connData[i]->post, 0, sizeof(HttpdPostData));
+	connData[i]->post->buff=NULL;
+	connData[i]->post->buffLen=0;
+	connData[i]->post->received=0;
+	connData[i]->post->len=-1;
+	connData[i]->hostName=NULL;
+	connData[i]->remote_port=remPort;
+	connData[i]->priv->sendBacklog=NULL;
+	connData[i]->priv->sendBacklogSize=0;
+	memcpy(connData[i]->remote_ip, remIp, 4);
 
 	return 1;
 }
@@ -657,8 +664,7 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 	int i;
 
 	for (i=0; i<MAX_CONN; i++) {
-		connData[i].conn=NULL;
-		connData[i].slot=i;
+		connData[i]=NULL;
 	}
 	builtInUrls=fixedUrls;
 
