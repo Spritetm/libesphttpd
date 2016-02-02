@@ -223,6 +223,12 @@ int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *re
 	return 0;
 }
 
+//Call before calling httpdStartResponse to disable automatically-chosen transfer
+//encodings (specifically, for now, chunking) and fall back on Connection: Close.
+void ICACHE_FLASH_ATTR httpdDisableTransferEncoding(HttpdConnData *conn) {
+	conn->priv->flags&=~HFL_CHUNKED;
+}
+
 //Start the response headers.
 void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
 	char buff[256];
