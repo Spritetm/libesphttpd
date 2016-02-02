@@ -19,8 +19,6 @@ Thanks to my collague at Espressif for writing the foundations of this code.
 #include "lwip/lwip/sockets.h"
 
 
-#define MAX_CONN 8 //ToDo: share with httpd.c
-
 static int httpPort;
 static int httpMaxConnCt;
 
@@ -32,7 +30,7 @@ struct  RtosConnType{
 	char ip[4];
 };
 
-static RtosConnType rconn[MAX_CONN];
+static RtosConnType rconn[HTTPD_MAX_CONNECTIONS];
 
 int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
 	conn->needWriteDoneNotif=1;
@@ -59,7 +57,7 @@ static void platHttpServerTask(void *pvParameters) {
 	struct sockaddr_in server_addr;
 	struct sockaddr_in remote_addr;
 
-	for (x=0; x<MAX_CONN; x++) {
+	for (x=0; x<HTTPD_MAX_CONNECTIONS; x++) {
 		rconn[x].fd=-1;
 	}
 	
@@ -90,7 +88,7 @@ static void platHttpServerTask(void *pvParameters) {
 
 	do{
 		/* Listen to the local connection */
-		ret = listen(listenfd, MAX_CONN);
+		ret = listen(listenfd, HTTPD_MAX_CONNECTIONS);
 		if (ret != 0) {
 			httpd_printf("platHttpServerTask: failed to listen!\n");
 			vTaskDelay(1000/portTICK_RATE_MS);
@@ -108,7 +106,7 @@ static void platHttpServerTask(void *pvParameters) {
 		//timeout.tv_sec = 2;
 		//timeout.tv_usec = 0;
 		
-		for(x=0; x<MAX_CONN; x++){
+		for(x=0; x<HTTPD_MAX_CONNECTIONS; x++){
 			if (rconn[x].fd!=-1) {
 				FD_SET(rconn[x].fd, &readset);
 				if (rconn[x].needWriteDoneNotif) FD_SET(rconn[x].fd, &writeset);
@@ -134,8 +132,8 @@ static void platHttpServerTask(void *pvParameters) {
 					httpd_printf("platHttpServerTask: Huh? Accept failed.\n");
 					continue;
 				}
-				for(x=0; x<MAX_CONN; x++) if (rconn[x].fd==-1) break;
-				if (x==MAX_CONN) {
+				for(x=0; x<HTTPD_MAX_CONNECTIONS; x++) if (rconn[x].fd==-1) break;
+				if (x==HTTPD_MAX_CONNECTIONS) {
 					httpd_printf("platHttpServerTask: Huh? Got accept with all slots full.\n");
 					continue;
 				}
@@ -168,7 +166,7 @@ static void platHttpServerTask(void *pvParameters) {
 			}
 			
 			//See if anything happened on the existing connections.
-			for(x=0; x < MAX_CONN; x++){
+			for(x=0; x < HTTPD_MAX_CONNECTIONS; x++){
 				//Skip empty slots
 				if (rconn[x].fd==-1) continue;
 
@@ -208,7 +206,7 @@ static void platHttpServerTask(void *pvParameters) {
 #if 0
 //Deinit code, not used here.
 	/*release data connection*/
-	for(x=0; x < MAX_CONN; x++){
+	for(x=0; x < HTTPD_MAX_CONNECTIONS; x++){
 		//find all valid handle 
 		if(connData[x].conn == NULL) continue;
 		if(connData[x].conn->sockfd >= 0){
@@ -233,7 +231,7 @@ static void platHttpServerTask(void *pvParameters) {
 void ICACHE_FLASH_ATTR httpdPlatInit(int port, int maxConnCt) {
 	httpPort=port;
 	httpMaxConnCt=maxConnCt;
-	xTaskCreate(platHttpServerTask, (const signed char *)"esphttpd", 1124, NULL, 4, NULL);
+	xTaskCreate(platHttpServerTask, (const signed char *)"esphttpd", HTTPD_STACKSIZE, NULL, 4, NULL);
 }
 
 

@@ -14,6 +14,9 @@ USE_HEATSHRINK ?= yes
 HTTPD_WEBSOCKETS ?= yes
 USE_OPENSDK ?= no
 FREERTOS ?= no
+HTTPD_MAX_CONNECTIONS ?= 8
+#For FreeRTOS
+HTTPD_STACKSIZE ?= 2048
 
 # Output directors to store intermediate compiled files
 # relative to the project directory
@@ -45,7 +48,8 @@ EXTRA_INCDIR	= ./include \
 # compiler flags using during compilation of source files
 CFLAGS		= -Os -ggdb -std=c99 -Werror -Wpointer-arith -Wundef -Wall -Wl,-EL -fno-inline-functions \
 		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH \
-		-Wno-address
+		-Wno-address -DHTTPD_MAX_CONNECTIONS=$(HTTPD_MAX_CONNECTIONS) -DHTTPD_STACKSIZE=$(HTTPD_STACKSIZE) \
+		
 
 
 

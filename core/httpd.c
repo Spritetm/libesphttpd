@@ -53,7 +53,7 @@ struct HttpdPriv {
 
 
 //Connection pool
-static HttpdConnData *connData[MAX_CONN];
+static HttpdConnData *connData[HTTPD_MAX_CONNECTIONS];
 
 //Struct to keep extension->mime data in
 typedef struct {
@@ -94,7 +94,7 @@ const char ICACHE_FLASH_ATTR *httpdGetMimetype(char *url) {
 
 //Looks up the connData info for a specific connection
 static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(ConnTypePtr conn, char *remIp, int remPort) {
-	for (int i=0; i<MAX_CONN; i++) {
+	for (int i=0; i<HTTPD_MAX_CONNECTIONS; i++) {
 		if (connData[i] && connData[i]->remote_port == remPort &&
 						memcmp(connData[i]->remote_ip, remIp, 4) == 0) {
 			connData[i]->conn=conn;
@@ -122,7 +122,7 @@ static void ICACHE_FLASH_ATTR httpdRetireConn(HttpdConnData *conn) {
 	if (conn->post!=NULL) free(conn->post);
 	if (conn->priv!=NULL) free(conn->priv);
 	if (conn) free(conn);
-	for (int i=0; i<MAX_CONN; i++) {
+	for (int i=0; i<HTTPD_MAX_CONNECTIONS; i++) {
 		if (connData[i]==conn) connData[i]=NULL;
 	}
 }
@@ -636,9 +636,9 @@ void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort
 int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort) {
 	int i;
 	//Find empty conndata in pool
-	for (i=0; i<MAX_CONN; i++) if (connData[i]==NULL) break;
+	for (i=0; i<HTTPD_MAX_CONNECTIONS; i++) if (connData[i]==NULL) break;
 	httpd_printf("Conn req from  %d.%d.%d.%d:%d, using pool slot %d\n", remIp[0]&0xff, remIp[1]&0xff, remIp[2]&0xff, remIp[3]&0xff, remPort, i);
-	if (i==MAX_CONN) {
+	if (i==HTTPD_MAX_CONNECTIONS) {
 		httpd_printf("Aiee, conn pool overflow!\n");
 		return 0;
 	}
@@ -668,11 +668,11 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 	int i;
 
-	for (i=0; i<MAX_CONN; i++) {
+	for (i=0; i<HTTPD_MAX_CONNECTIONS; i++) {
 		connData[i]=NULL;
 	}
 	builtInUrls=fixedUrls;
 
-	httpdPlatInit(port, MAX_CONN);
+	httpdPlatInit(port, HTTPD_MAX_CONNECTIONS);
 	httpd_printf("Httpd init\n");
 }
