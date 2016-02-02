@@ -25,7 +25,7 @@ typedef RtosConnType* ConnTypePtr;
 #define strlen(a) os_strlen(a)
 #define memcmp(a, b, c) os_memcmp(a, b, c)
 typedef struct espconn* ConnTypePtr;
-#define httpdprintf(format, ...) os_printf(format, __VA_ARGS__)
+#define httpd_printf(format, ...) os_printf(format, ##__VA_ARGS__)
 #endif
 
 
