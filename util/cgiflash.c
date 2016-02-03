@@ -95,8 +95,8 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 
 	int offset = connData->post->received - connData->post->buffLen;
 	if (offset == 0) {
-		connData->cgiPrivData = NULL;
-	} else if (connData->cgiPrivData != NULL) {
+		connData->cgiData = NULL;
+	} else if (connData->cgiData != NULL) {
 		// we have an error condition, do nothing
 		return HTTPD_CGI_DONE;
 	}
@@ -131,7 +131,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 		httpdSend(connData, "Firmware image error:\r\n", -1);
 		httpdSend(connData, err, -1);
 		httpdSend(connData, "\r\n", -1);
-		connData->cgiPrivData = (void *)1;
+		connData->cgiData = (void *)1;
 		return HTTPD_CGI_DONE;
 	}
 

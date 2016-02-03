@@ -170,7 +170,7 @@ int ICACHE_FLASH_ATTR cgiWebSocketRecv(HttpdConnData *connData, char *data, int 
 	int i, j, sl;
 	int r=HTTPD_CGI_MORE;
 	int wasHeaderByte;
-	Websock *ws=(Websock*)connData->cgiPrivData;
+	Websock *ws=(Websock*)connData->cgiData;
 	for (i=0; i<len; i++) {
 //		httpd_printf("Ws: State %d byte 0x%02X\n", ws->priv->wsStatus, data[i]);
 		wasHeaderByte=1;
@@ -272,8 +272,8 @@ int ICACHE_FLASH_ATTR cgiWebSocketRecv(HttpdConnData *connData, char *data, int 
 		//We're going to tell the main webserver we're done. The webserver expects us to clean up by ourselves
 		//we're chosing to be done. Do so.
 		websockFree(ws);
-		free(connData->cgiPrivData);
-		connData->cgiPrivData=NULL;
+		free(connData->cgiData);
+		connData->cgiData=NULL;
 	}
 	return r;
 }
@@ -286,16 +286,16 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 	if (connData->conn==NULL) {
 		//Connection aborted. Clean up.
 		httpd_printf("WS: Cleanup\n");
-		if (connData->cgiPrivData) {
-			Websock *ws=(Websock*)connData->cgiPrivData;
+		if (connData->cgiData) {
+			Websock *ws=(Websock*)connData->cgiData;
 			websockFree(ws);
-			free(connData->cgiPrivData);
-			connData->cgiPrivData=NULL;
+			free(connData->cgiData);
+			connData->cgiData=NULL;
 		}
 		return HTTPD_CGI_DONE;
 	}
 	
-	if (connData->cgiPrivData==NULL) {
+	if (connData->cgiData==NULL) {
 //		httpd_printf("WS: First call\n");
 		//First call here. Check if client headers are OK, send server header.
 		i=httpdGetHeader(connData, "Upgrade", buff, sizeof(buff)-1);
@@ -306,9 +306,9 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 //				httpd_printf("WS: Key: %s\n", buff);
 				//Seems like a WebSocket connection.
 				// Alloc structs
-				connData->cgiPrivData=malloc(sizeof(Websock));
-				memset(connData->cgiPrivData, 0, sizeof(Websock));
-				Websock *ws=(Websock*)connData->cgiPrivData;
+				connData->cgiData=malloc(sizeof(Websock));
+				memset(connData->cgiData, 0, sizeof(Websock));
+				Websock *ws=(Websock*)connData->cgiData;
 				ws->priv=malloc(sizeof(WebsockPriv));
 				memset(ws->priv, 0, sizeof(WebsockPriv));
 				ws->conn=connData;
@@ -346,7 +346,7 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 	}
 	
 	//Sending is done. Call the sent callback if we have one.
-	Websock *ws=(Websock*)connData->cgiPrivData;
+	Websock *ws=(Websock*)connData->cgiData;
 	if (ws && ws->sentCb) ws->sentCb(ws);
 
 	return HTTPD_CGI_MORE;

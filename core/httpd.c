@@ -628,6 +628,7 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 					conn->priv->head[conn->priv->headPos++]='\r';
 				}
 			}
+			//ToDo: return http error code 431 (request header too long) if this happens
 			if (conn->priv->headPos!=MAX_HEAD_LEN) conn->priv->head[conn->priv->headPos++]=data[x];
 			conn->priv->head[conn->priv->headPos]=0;
 			//Scan for /r/n/r/n. Receiving this indicate the headers end.
