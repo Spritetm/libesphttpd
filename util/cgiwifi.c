@@ -21,6 +21,8 @@ Cgi/template routines for the /wifi url.
 //WiFi access point data
 typedef struct {
 	char ssid[32];
+  char bssid[6];
+	int channel;
 	char rssi;
 	char enc;
 } ApData;
@@ -84,8 +86,10 @@ void ICACHE_FLASH_ATTR wifiScanDoneCb(void *arg, STATUS status) {
 		//Save the ap data.
 		cgiWifiAps.apData[n]=(ApData *)malloc(sizeof(ApData));
 		cgiWifiAps.apData[n]->rssi=bss_link->rssi;
+		cgiWifiAps.apData[n]->channel=bss_link->channel;
 		cgiWifiAps.apData[n]->enc=bss_link->authmode;
 		strncpy(cgiWifiAps.apData[n]->ssid, (char*)bss_link->ssid, 32);
+		strncpy(cgiWifiAps.apData[n]->bssid, (char*)bss_link->bssid, 6);
 
 		bss_link = bss_link->next.stqe_next;
 		n++;
@@ -114,9 +118,9 @@ int ICACHE_FLASH_ATTR cgiWiFiScan(HttpdConnData *connData) {
 	if (!cgiWifiAps.scanInProgress && pos!=0) {
 		//Fill in json code for an access point
 		if (pos-1<cgiWifiAps.noAps) {
-			len=sprintf(buff, "{\"essid\": \"%s\", \"rssi\": \"%d\", \"enc\": \"%d\"}%s\n", 
-					cgiWifiAps.apData[pos-1]->ssid, cgiWifiAps.apData[pos-1]->rssi, 
-					cgiWifiAps.apData[pos-1]->enc, (pos-1==cgiWifiAps.noAps-1)?"":",");
+			len=sprintf(buff, "{\"essid\": \"%s\", \"bssid\": \"" MACSTR "\", \"rssi\": \"%d\", \"enc\": \"%d\", \"channel\": \"%d\"}%s\n",
+					cgiWifiAps.apData[pos-1]->ssid, MAC2STR(cgiWifiAps.apData[pos-1]->bssid), cgiWifiAps.apData[pos-1]->rssi,
+					cgiWifiAps.apData[pos-1]->enc, cgiWifiAps.apData[pos-1]->channel, (pos-1==cgiWifiAps.noAps-1)?"":",");
 			httpdSend(connData, buff, len);
 		}
 		pos++;
