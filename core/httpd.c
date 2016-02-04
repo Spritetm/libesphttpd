@@ -52,6 +52,7 @@ struct HttpdPriv {
 	int headPos;
 	char *sendBuff;
 	int sendBuffLen;
+	char *chunkHdr;
 	HttpSendBacklogItem *sendBacklog;
 	int sendBacklogSize;
 	int flags;
@@ -348,39 +349,52 @@ int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
 //the data is seen as a C-string.
 //Returns 1 for success, 0 for out-of-memory.
 int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) {
-	int r;
 	if (conn->conn==NULL) return 0;
 	if (len<0) len=strlen(data);
-	if (conn->priv->sendBuffLen+len>MAX_SENDBUFF_LEN) return 0;
-	if (conn->priv->flags&HFL_CHUNKED && conn->priv->flags&HFL_SENDINGBODY) {
-		if (conn->priv->sendBuffLen+len+8>MAX_SENDBUFF_LEN) return 0;
-		//Prefix with chunk header
-		r=sprintf(&conn->priv->sendBuff[conn->priv->sendBuffLen], "%X\r\n", len);
-		conn->priv->sendBuffLen+=r;
-		//Copy data
-		memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
-		conn->priv->sendBuffLen+=len;
-		//Postfix with cr/lf
-		r=sprintf(&conn->priv->sendBuff[conn->priv->sendBuffLen], "\r\n");
-		conn->priv->sendBuffLen+=r;
-	} else {
-		if (conn->priv->sendBuffLen+len>MAX_SENDBUFF_LEN) return 0;
-		memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
-		conn->priv->sendBuffLen+=len;
+	if (len==0) return 0;
+	if (conn->priv->flags&HFL_CHUNKED && conn->priv->flags&HFL_SENDINGBODY && conn->priv->chunkHdr==NULL) {
+		if (conn->priv->sendBuffLen+len+6>MAX_SENDBUFF_LEN) return 0;
+		//Establish start of chunk
+		conn->priv->chunkHdr=&conn->priv->sendBuff[conn->priv->sendBuffLen];
+		strcpy(conn->priv->chunkHdr, "0000\r\n");
+		conn->priv->sendBuffLen+=6;
 	}
+	if (conn->priv->sendBuffLen+len>MAX_SENDBUFF_LEN) return 0;
+	memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
+	conn->priv->sendBuffLen+=len;
 	return 1;
 }
 
+static char ICACHE_FLASH_ATTR httpdHexNibble(int val) {
+	val&=0xf;
+	if (val<10) return '0'+val;
+	return 'A'+(val-10);
+}
 
 //Function to send any data in conn->priv->sendBuff. Do not use in CGIs unless you know what you
 //are doing! Also, if you do set conn->cgi to NULL to indicate the connection is closed, do it BEFORE
 //calling this.
 void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
-	int r;
+	int r, len;
 	if (conn->conn==NULL) return;
-	if (conn->cgi==NULL && conn->priv->flags&HFL_CHUNKED && conn->priv->flags&HFL_SENDINGBODY){
-		//End chunk
-		conn->priv->sendBuffLen+=sprintf(&conn->priv->sendBuff[conn->priv->sendBuffLen], "0\r\n\r\n");
+	if (conn->priv->chunkHdr!=NULL) {
+		//We're sending chunked data, and the chunk needs fixing up.
+		//Finish chunk with cr/lf
+		httpdSend(conn, "\r\n", 2);
+		//Calculate length of chunk
+		len=((&conn->priv->sendBuff[conn->priv->sendBuffLen])-conn->priv->chunkHdr)-8;
+		//Fix up chunk header to correct value
+		conn->priv->chunkHdr[0]=httpdHexNibble(len>>12);
+		conn->priv->chunkHdr[1]=httpdHexNibble(len>>8);
+		conn->priv->chunkHdr[2]=httpdHexNibble(len>>4);
+		conn->priv->chunkHdr[3]=httpdHexNibble(len>>0);
+		//Reset chunk hdr for next call
+		conn->priv->chunkHdr=NULL;
+	}
+	if (conn->priv->flags&HFL_CHUNKED && conn->priv->flags&HFL_SENDINGBODY && conn->cgi==NULL) {
+		//Connection finished sending whatever needs to be sent. Add NULL chunk to indicate this.
+		strcpy(&conn->priv->sendBuff[conn->priv->sendBuffLen], "0\r\n\r\n");
+		conn->priv->sendBuffLen+=5;
 	}
 	if (conn->priv->sendBuffLen!=0) {
 		r=httpdPlatSendData(conn->conn, conn->priv->sendBuff, conn->priv->sendBuffLen);
@@ -686,6 +700,7 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort) {
 	HttpdConnData *hconn=httpdFindConnData(rconn, remIp, remPort);
 	if (hconn==NULL) return;
+	httpd_printf("Pool slot %d: socket closed.\n", hconn->slot);
 	hconn->conn=NULL; //indicate cgi the connection is gone
 	if (hconn->cgi) hconn->cgi(hconn); //Execute cgi fn if needed
 	httpdRetireConn(hconn);
