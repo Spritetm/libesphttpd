@@ -45,6 +45,7 @@ struct HttpSendBacklogItem {
 #define HFL_HTTP11 (1<<0)
 #define HFL_CHUNKED (1<<1)
 #define HFL_SENDINGBODY (1<<2)
+#define HFL_DISCONAFTERSENT (1<<3)
 
 //Private data for http connection
 struct HttpdPriv {
@@ -426,6 +427,26 @@ void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
 	}
 }
 
+void ICACHE_FLASH_ATTR httpdCgiIsDone(HttpdConnData *conn) {
+	conn->cgi=NULL; //no need to call this anymore
+	if (conn->priv->flags&HFL_CHUNKED) {
+		httpd_printf("Pool slot %d is done. Cleaning up for next req\n", conn->slot);
+		httpdFlushSendBuffer(conn);
+		//Note: Do not clean up sendBacklog, it may still contain data at this point.
+		conn->priv->headPos=0;
+		conn->post->len=-1;
+		conn->priv->flags=0;
+		if (conn->post->buff) free(conn->post->buff);
+		conn->post->buff=NULL;
+		conn->post->buffLen=0;
+		conn->post->received=0;
+		conn->hostName=NULL;
+	} else {
+		//Cannot re-use this connection. Mark to get it killed after all data is sent.
+		conn->priv->flags|=HFL_DISCONAFTERSENT;
+	}
+}
+
 //Callback called when the data on a socket has been successfully
 //sent.
 void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) {
@@ -445,35 +466,25 @@ void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) 
 		return;
 	}
 
-
-	if (conn->cgi==NULL) { //Marked for destruction?
-		if (conn->priv->flags&HFL_CHUNKED) {
-			httpd_printf("Pool slot %d is done. Cleaning up for next req\n", conn->slot);
-			conn->priv->headPos=0;
-			conn->post->len=-1;
-			conn->priv->flags=0;
-			if (conn->post->buff) free(conn->post->buff);
-			conn->post->buff=NULL;
-			conn->post->buffLen=0;
-			conn->post->received=0;
-			conn->hostName=NULL;
-		} else {
-			httpd_printf("Pool slot %d is done. Closing.\n", conn->slot);
-			httpdPlatDisconnect(conn->conn);
-		}
+	if (conn->priv->flags&HFL_DISCONAFTERSENT) { //Marked for destruction?
+		httpd_printf("Pool slot %d is done. Closing.\n", conn->slot);
+		httpdPlatDisconnect(conn->conn);
 		return; //No need to call httpdFlushSendBuffer.
 	}
+
+	//If we don't have a CGI function, there's nothing to do but wait for something from the client.
+	if (conn->cgi==NULL) return;
 
 	sendBuff=malloc(MAX_SENDBUFF_LEN);
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
 	r=conn->cgi(conn); //Execute cgi fn.
 	if (r==HTTPD_CGI_DONE) {
-		conn->cgi=NULL; //mark for destruction.
+		httpdCgiIsDone(conn);
 	}
 	if (r==HTTPD_CGI_NOTFOUND || r==HTTPD_CGI_AUTHENTICATED) {
 		httpd_printf("ERROR! CGI fn returns code %d after sending data! Bad CGI!\n", r);
-		conn->cgi=NULL; //mark for destruction.
+		httpdCgiIsDone(conn);
 	}
 	httpdFlushSendBuffer(conn);
 	free(sendBuff);
@@ -525,8 +536,7 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 			return;
 		} else if (r==HTTPD_CGI_DONE) {
 			//Yep, it's happy to do so and already is done sending data.
-			conn->cgi=NULL; //mark conn for destruction
-			httpdFlushSendBuffer(conn);
+			httpdCgiIsDone(conn);
 			return;
 		} else if (r==HTTPD_CGI_NOTFOUND || r==HTTPD_CGI_AUTHENTICATED) {
 			//URL doesn't want to handle the request: either the data isn't found or there's no
@@ -683,11 +693,12 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 				r=conn->recvHdl(conn, data+x, len-x);
 				if (r==HTTPD_CGI_DONE) {
 					httpd_printf("Recvhdl returned DONE\n");
-					conn->cgi=NULL; //mark conn for destruction
-					httpdFlushSendBuffer(conn);
+					httpdCgiIsDone(conn);
 					//We assume the recvhdlr has sent something; we'll kill the sock in the sent callback.
 				}
 				break; //ignore rest of data, recvhdl has parsed it.
+			} else {
+				httpd_printf("Eh? Got unexpected data from client. %s\n", data);
 			}
 		}
 	}
