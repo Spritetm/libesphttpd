@@ -683,8 +683,17 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 			if (conn->post->buffLen >= conn->post->buffSize || conn->post->received == conn->post->len) {
 				//Received a chunk of post data
 				conn->post->buff[conn->post->buffLen]=0; //zero-terminate, in case the cgi handler knows it can use strings
-				//Send the response.
-				httpdProcessRequest(conn);
+				//Process the data
+				if (conn->cgi) {
+					r=conn->cgi(conn);
+					if (r==HTTPD_CGI_DONE) {
+						httpdCgiIsDone(conn);
+					}
+				} else {
+					//No CGI fn set yet: probably first call. Allow httpdProcessRequest to choose CGI and
+					//call it the first time.
+					httpdProcessRequest(conn);
+				}
 				conn->post->buffLen = 0;
 			}
 		} else {
