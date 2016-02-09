@@ -291,6 +291,14 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 }
 
 
+
+static os_timer_t resetTimer;
+
+static void ICACHE_FLASH_ATTR resetTimerCb(void *arg) {
+	system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
+	system_upgrade_reboot();
+}
+
 // Handle request to reboot into the new firmware
 int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {
 	if (connData->conn==NULL) {
@@ -301,12 +309,15 @@ int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {
 	// TODO: sanity-check that the 'next' partition actually contains something that looks like
 	// valid firmware
 
-	// This should probably be forked into a separate task that waits a second to let the
-	// current HTTP request finish...
-	system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
-	system_upgrade_reboot();
+	//Do reboot in a timer callback so we still have time to send the response.
+	os_timer_disarm(&resetTimer);
+	os_timer_setfn(&resetTimer, resetTimerCb, NULL);
+	os_timer_arm(&resetTimer, 200, 0);
+
 	httpdStartResponse(connData, 200);
+	httpdHeader(connData, "Content-Type", "text/plain");
 	httpdEndHeaders(connData);
+	httpdSend(connData, "Rebooting...", -1);
 	return HTTPD_CGI_DONE;
 }
 
