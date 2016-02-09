@@ -42,6 +42,11 @@ void ICACHE_FLASH_ATTR httpdPlatDisconnect(ConnTypePtr conn) {
 	conn->needWriteDoneNotif=1; //because the real close is done in the writable select code
 }
 
+void httpdPlatDisableTimeout(ConnTypePtr conn) {
+	//Unimplemented for FreeRTOS
+}
+
+
 #define RECV_BUF_SIZE 2048
 static void platHttpServerTask(void *pvParameters) {
 	int32 listenfd;

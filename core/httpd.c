@@ -532,6 +532,11 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 		r=conn->cgi(conn);
 		if (r==HTTPD_CGI_MORE) {
 			//Yep, it's happy to do so and has more data to send.
+			if (conn->recvHdl) {
+				//Seems the CGI is planning to do some long-term communications with the socket.
+				//Disable the timeout on it, so we won't run into that.
+				httpdPlatDisableTimeout(conn->conn);
+			}
 			httpdFlushSendBuffer(conn);
 			return;
 		} else if (r==HTTPD_CGI_DONE) {
