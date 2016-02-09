@@ -88,6 +88,12 @@ int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
 //a direct POST from e.g. Curl or a Javascript AJAX call with either the
 //firmware given by cgiGetFirmwareNext or an OTA upgrade image.
 
+//Because we don't have the buffer to allocate an entire sector but will 
+//have to buffer some data because the post buffer may be misaligned, we 
+//write SPI data in pages. The page size is a software thing, not
+//a hardware one.
+#define PAGELEN 64
+
 #define FLST_START 0
 #define FLST_WRITE 1
 #define FLST_SKIP 2
@@ -101,8 +107,8 @@ typedef struct {
 	int state;
 	int filetype;
 	int flashPos;
-	char sectorData[SPI_FLASH_SEC_SIZE];
-	int sectorPos;
+	char pageData[PAGELEN];
+	int pagePos;
 	int address;
 	int len;
 	int skip;
@@ -131,6 +137,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 
 	if (state==NULL) {
 		//First call. Allocate and initialize state variable.
+		httpd_printf("Firmware upload cgi start.\n");
 		state=malloc(sizeof(UploadState));
 		if (state==NULL) {
 			httpd_printf("Can't allocate firmware upload struct!\n");
@@ -139,6 +146,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 		memset(state, 0, sizeof(UploadState));
 		state->state=FLST_START;
 		connData->cgiData=state;
+		state->err="Premature end";
 	}
 	
 	char *data=connData->post->buff;
@@ -150,11 +158,11 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 			if (def->type==CGIFLASH_TYPE_FW && memcmp(data, "EHUG", 4)==0) {
 				//Type is combined flash1/flash2 file
 				OtaHeader *h=(OtaHeader*)data;
-				memcpy(buff, h->tag, 27);
+				strncpy(buff, h->tag, 27);
 				buff[27]=0;
 				if (strcmp(buff, def->tagName)!=0) {
 					httpd_printf("OTA tag mismatch! Current=`%s` uploaded=`%s`.\n",
-										buff, def->tagName);
+										def->tagName, buff);
 					len=httpdFindArg(connData->getArgs, "force", buff, sizeof(buff));
 					if (len!=-1 && atoi(buff)) {
 						httpd_printf("Forcing firmware flash.\n");
@@ -206,6 +214,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 			} else {
 				state->err="Invalid flash image type!";
 				state->state=FLST_ERROR;
+				httpd_printf("Did not recognize flash image type!\n");
 			}
 		} else if (state->state==FLST_SKIP) {
 			//Skip bytes without doing anything with them
@@ -221,31 +230,33 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 				if (state->len) state->state=FLST_WRITE; else state->state=FLST_DONE;
 			}
 		} else if (state->state==FLST_WRITE) {
-			//Copy bytes to sector buffer, and if sector buffer is full, flash the data.
-			//First, calculate the amount of bytes we need to finish the sector buffer.
-			int lenLeft=SPI_FLASH_SEC_SIZE-state->sectorPos;
+			//Copy bytes to page buffer, and if page buffer is full, flash the data.
+			//First, calculate the amount of bytes we need to finish the page buffer.
+			int lenLeft=PAGELEN-state->pagePos;
 			if (state->len<lenLeft) lenLeft=state->len; //last buffer can be a cut-off one
-			//See if we need to write the sector.
+			//See if we need to write the page.
 			if (dataLen<lenLeft) {
-				//Sector isn't done yet. Copy data to buffer and exit.
-				memcpy(&state->sectorData[state->sectorPos], data, dataLen);
-				state->sectorPos+=dataLen;
+				//Page isn't done yet. Copy data to buffer and exit.
+				memcpy(&state->pageData[state->pagePos], data, dataLen);
+				state->pagePos+=dataLen;
 				state->len-=dataLen;
 				dataLen=0;
 			} else {
-				//Finish sector; take data we need from post buffer
-				memcpy(&state->sectorData[state->sectorPos], data, lenLeft);
+				//Finish page; take data we need from post buffer
+				memcpy(&state->pageData[state->pagePos], data, lenLeft);
 				data+=lenLeft;
 				dataLen-=lenLeft;
-				state->sectorPos+=lenLeft;
+				state->pagePos+=lenLeft;
 				state->len-=lenLeft;
-				//Erase sector
-				spi_flash_erase_sector(state->address/SPI_FLASH_SEC_SIZE);
-				//Write sector
-				httpd_printf("Writing %d bytes of data to SPI pos 0x%x...\n", state->sectorPos, state->address);
-				spi_flash_write(state->address, (uint32 *)state->sectorData, state->sectorPos);
-				state->address+=SPI_FLASH_SEC_SIZE;
-				state->sectorPos=0;
+				//Erase sector, if needed
+				if ((state->address&(SPI_FLASH_SEC_SIZE-1))==0) {
+					spi_flash_erase_sector(state->address/SPI_FLASH_SEC_SIZE);
+				}
+				//Write page
+				//httpd_printf("Writing %d bytes of data to SPI pos 0x%x...\n", state->pagePos, state->address);
+				spi_flash_write(state->address, (uint32 *)state->pageData, state->pagePos);
+				state->address+=PAGELEN;
+				state->pagePos=0;
 				if (state->len==0) {
 					//Done.
 					if (state->skip) state->state=FLST_SKIP; else state->state=FLST_DONE;
@@ -261,12 +272,13 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 		}
 	}
 	
-	if (connData->post->received==connData->post->len) {
+	if (connData->post->len==connData->post->received) {
 		//We're done! Format a response.
+		httpd_printf("Upload done. Sending response.\n");
 		httpdStartResponse(connData, state->state==FLST_ERROR?400:200);
 		httpdHeader(connData, "Content-Type", "text/plain");
 		httpdEndHeaders(connData);
-		if (state->state==FLST_ERROR) {
+		if (state->state!=FLST_DONE) {
 			httpdSend(connData, "Firmware image error:", -1);
 			httpdSend(connData, state->err, -1);
 			httpdSend(connData, "\n", -1);
