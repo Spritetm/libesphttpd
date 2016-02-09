@@ -272,9 +272,9 @@ In all cases, `connData->post->len` will contain the length of the entirety of t
 total POST data is larger than the POST buffer, the latter will be less than the former. In this case, the 
 CGI function is expected to not send any headers or data out yet, but to process the incoming bit of POST data and
 return with `HTTPD_CGI_MORE`. The next call will contain the next chunk of POST data. `connData->post->received`
-will always contain the total amount of POST data received for the request, and when that number equals
-`connData->post->received`, it means no more POST data is expected and the CGI function is free to send
-out the reply headers and data for the request.
+will always contain the total amount of POST data received for the request, including the data passed
+to the CGI. When that number equals `connData->post->len`, it means no more POST data is expected and 
+the CGI function is free to send out the reply headers and data for the request.
 
 ## The template engine
 
