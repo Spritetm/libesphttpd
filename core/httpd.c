@@ -17,8 +17,6 @@ Esp8266 http server - core routines
 #include "httpd-platform.h"
 
 
-//Max amount of simultaneous connections
-#define MAX_CONN 8
 //Max length of request head. This is statically allocated for each connection.
 #define MAX_HEAD_LEN 1024
 //Max post buffer len. This is dynamically malloc'ed if needed.
