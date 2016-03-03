@@ -11,6 +11,8 @@ Some flash handling cgi routines. Used for reading the existing flash and updati
  * ----------------------------------------------------------------------------
  */
 
+//This doesn't work yet on the ESP32. ToDo: figure out how to make it work.
+#ifndef ESP32
 
 #include <esp8266.h>
 #include "cgiflash.h"
@@ -321,3 +323,4 @@ int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {
 	return HTTPD_CGI_DONE;
 }
 
+#endif

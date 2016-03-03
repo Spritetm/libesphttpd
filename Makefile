@@ -5,7 +5,6 @@ THISDIR:=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 #Include httpd config from lower level, if it exists
 -include ../esphttpdconfig.mk
 
-
 #Default options. If you want to change them, please create ../esphttpdconfig.mk with the options you want in it.
 GZIP_COMPRESSION ?= no
 COMPRESS_W_YUI ?= no
@@ -13,10 +12,17 @@ YUI-COMPRESSOR ?= /usr/bin/yui-compressor
 USE_HEATSHRINK ?= yes
 HTTPD_WEBSOCKETS ?= yes
 USE_OPENSDK ?= no
-FREERTOS ?= no
 HTTPD_MAX_CONNECTIONS ?= 4
 #For FreeRTOS
 HTTPD_STACKSIZE ?= 2048
+#Auto-detect ESP32 build if not given.
+ifneq (,$(wildcard $(SDK_PATH)/include/esp32))
+ESP32 ?= yes
+FREERTOS ?= yes
+else
+ESP32 ?= no
+FREERTOS ?= no
+endif
 
 # Output directors to store intermediate compiled files
 # relative to the project directory
@@ -49,8 +55,6 @@ EXTRA_INCDIR	= ./include \
 CFLAGS		= -Os -ggdb -std=c99 -Werror -Wpointer-arith -Wundef -Wall -Wl,-EL -fno-inline-functions \
 		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH \
 		-Wno-address -DHTTPD_MAX_CONNECTIONS=$(HTTPD_MAX_CONNECTIONS) -DHTTPD_STACKSIZE=$(HTTPD_STACKSIZE) \
-		
-
 
 
 # various paths from the SDK used in this project
@@ -60,6 +64,20 @@ SDK_LDDIR	= ld
 
 ifeq ("$(FREERTOS)","yes")
 CFLAGS		+= -DFREERTOS -DLWIP_OPEN_SRC -ffunction-sections -fdata-sections 
+ifeq ("$(ESP32)","yes")
+SDK_INCDIR	= include \
+			include/esp32 \
+			driver_lib/include \
+			extra_include \
+			third_party/include \
+			third_party/include/cjson \
+			third_party/include/freertos \
+			third_party/include/lwip \
+			third_party/include/lwip/ipv4 \
+			third_party/include/lwip/ipv6 \
+			third_party/include/ssl
+CFLAGS		+= -DESP32 -DFREERTOS -DLWIP_OPEN_SRC -ffunction-sections -fdata-sections 
+else
 SDK_INCDIR	= include \
 			include/freertos \
 			include/espressif/esp8266 \
@@ -69,6 +87,8 @@ SDK_INCDIR	= include \
 			include/lwip/lwip \
 			include/lwip/ipv4 \
 			include/lwip/ipv6
+CFLAGS		+= -DFREERTOS -DLWIP_OPEN_SRC -ffunction-sections -fdata-sections 
+endif
 SDK_INCDIR	:= $(addprefix -I$(SDK_PATH)/,$(SDK_INCDIR))
 else
 SDK_INCDIR	= include
@@ -76,11 +96,18 @@ SDK_INCDIR	:= $(addprefix -I$(SDK_BASE)/,$(SDK_INCDIR))
 endif
 
 
+ifeq ("$(ESP32)","yes")
+TOOLPREFIX=xtensa-esp108-elf-
+CFLAGS+=-DESP32
+else
+TOOLPREFIX=xtensa-lx106-elf-
+endif
+
 # select which tools to use as compiler, librarian and linker
-CC		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-gcc
-AR		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-ar
-LD		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-gcc
-OBJCOPY	:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-objcopy
+CC		:= $(XTENSA_TOOLS_ROOT)$(TOOLPREFIX)gcc
+AR		:= $(XTENSA_TOOLS_ROOT)$(TOOLPREFIX)ar
+LD		:= $(XTENSA_TOOLS_ROOT)$(TOOLPREFIX)gcc
+OBJCOPY	:= $(XTENSA_TOOLS_ROOT)$(TOOLPREFIX)objcopy
 
 ####
 #### no user configurable options below here
