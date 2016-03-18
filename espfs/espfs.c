@@ -66,9 +66,17 @@ Accessing the flash through the mem emulation at 0x40200000 is a bit hairy: All 
 a memory exception, crashing the program.
 */
 
+#ifndef ESP32
+#define FLASH_BASE_ADDR 0x40200000
+#else
+//ESP32 IRAM addresses start at 0x40000000, but the IRAM segment actually is mapped
+//starting from SPI address 0x40000.
+#define FLASH_BASE_ADDR 0x40040000
+#endif
+
 EspFsInitResult ICACHE_FLASH_ATTR espFsInit(void *flashAddress) {
-	if((uint32_t)flashAddress > 0x40200000) {
-		flashAddress = (void*)((uint32_t)flashAddress-0x40200000);
+	if((uint32_t)flashAddress > 0x40000000) {
+		flashAddress = (void*)((uint32_t)flashAddress-FLASH_BASE_ADDR);
 	}
 
 	// base address must be aligned to 4 bytes
