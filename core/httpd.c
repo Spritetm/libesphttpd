@@ -44,6 +44,7 @@ struct HttpSendBacklogItem {
 #define HFL_CHUNKED (1<<1)
 #define HFL_SENDINGBODY (1<<2)
 #define HFL_DISCONAFTERSENT (1<<3)
+#define HFL_NOAUTOCONNECTION (1<<4)
 
 //Private data for http connection
 struct HttpdPriv {
@@ -229,14 +230,21 @@ void ICACHE_FLASH_ATTR httpdDisableTransferEncoding(HttpdConnData *conn) {
 	conn->priv->flags&=~HFL_CHUNKED;
 }
 
+// Call before calling httpdStartResponse to disable automatically
+// added 'Connection: close' header.
+void ICACHE_FLASH_ATTR httpdNoAutoConnectionHeader(HttpdConnData *conn) {
+	conn->priv->flags &= ~HFL_NOAUTOCONNECTION;
+}
+
 //Start the response headers.
 void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
 	char buff[256];
 	int l;
-	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\n%s\r\n", 
+	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\n%s%s",
 			(conn->priv->flags&HFL_HTTP11)?1:0, 
 			code, 
-			(conn->priv->flags&HFL_CHUNKED)?"Transfer-Encoding: chunked":"Connection: close");
+			(conn->priv->flags & HFL_CHUNKED) ? "Transfer-Encoding: chunked\r\n" : "",
+			(conn->priv->flags & HFL_NOAUTOCONNECTION) ? "" : "Connection: close\r\n");
 	httpdSend(conn, buff, l);
 }
 

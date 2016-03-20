@@ -317,6 +317,7 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 				sha1_init(&s);
 				sha1_write(&s, buff, strlen(buff));
 				httpdDisableTransferEncoding(connData);
+				httpdNoAutoConnectionHeader(connData);
 				httpdStartResponse(connData, 101);
 				httpdHeader(connData, "Upgrade", "websocket");
 				httpdHeader(connData, "Connection", "upgrade");
