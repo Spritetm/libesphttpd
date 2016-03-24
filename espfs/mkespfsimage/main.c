@@ -5,8 +5,10 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
 #include <string.h>
+#ifdef __MINGW32__
+#include <io.h>
+#endif
 #include "espfs.h"
 #include "espfsformat.h"
 
@@ -24,6 +26,10 @@
 #include <zlib.h>
 #endif
 
+//Cygwin e.a. needs O_BINARY. Don't miscompile if it's not set.
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
 
 //Routines to convert host format to the endianness used in the xtensa
 short htoxs(short in) {
@@ -281,6 +287,9 @@ int main(int argc, char **argv) {
 	int compType;  //default compression type - heatshrink
 	int compLvl=-1;
 
+#ifdef __MINGW32__
+	setmode(fileno(stdout), O_BINARY);
+#endif
 #ifdef ESPFS_HEATSHRINK
 	compType = COMPRESS_HEATSHRINK;
 #else
@@ -341,7 +350,7 @@ int main(int argc, char **argv) {
 			realName=fileName;
 			if (fileName[0]=='.') realName++;
 			if (realName[0]=='/') realName++;
-			f=open(fileName, O_RDONLY);
+			f=open(fileName, O_RDONLY|O_BINARY);
 			if (f>0) {
 				char *compName = "unknown";
 				rate=handleFile(f, realName, compType, compLvl, &compName);
