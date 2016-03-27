@@ -261,7 +261,7 @@ int handleFile(int f, char *name, int compression, int level, char **compName) {
 			*compName = "unknown";
 		}
 	}
-	return (csize*100)/size;
+	return size ? (csize*100)/size : 100;
 }
 
 //Write final dummy header with FLAG_LASTFILE set.
