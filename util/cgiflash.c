@@ -62,30 +62,6 @@ int ICACHE_FLASH_ATTR cgiGetFirmwareNext(HttpdConnData *connData) {
 }
 
 
-//Cgi that reads the SPI flash. Assumes 512KByte flash.
-//ToDo: Figure out real flash size somehow?
-int ICACHE_FLASH_ATTR cgiReadFlash(HttpdConnData *connData) {
-	int *pos=(int *)&connData->cgiData;
-	if (connData->conn==NULL) {
-		//Connection aborted. Clean up.
-		return HTTPD_CGI_DONE;
-	}
-
-	if (*pos==0) {
-		httpd_printf("Start flash download.\n");
-		httpdStartResponse(connData, 200);
-		httpdHeader(connData, "Content-Type", "application/bin");
-		httpdEndHeaders(connData);
-		*pos=0x40200000;
-		return HTTPD_CGI_MORE;
-	}
-	//Send 1K of flash per call. We will get called again if we haven't sent 512K yet.
-	httpdSend(connData, (char*)(*pos), 1024);
-	*pos+=1024;
-	if (*pos>=0x40200000+(512*1024)) return HTTPD_CGI_DONE; else return HTTPD_CGI_MORE;
-}
-
-
 //Cgi that allows the firmware to be replaced via http POST This takes
 //a direct POST from e.g. Curl or a Javascript AJAX call with either the
 //firmware given by cgiGetFirmwareNext or an OTA upgrade image.
