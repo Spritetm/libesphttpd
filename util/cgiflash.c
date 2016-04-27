@@ -1,5 +1,5 @@
 /*
-Some flash handling cgi routines. Used for reading the existing flash and updating the ESPFS image.
+Some flash handling cgi routines. Used for updating the ESPFS/OTA image.
 */
 
 /*
