@@ -2,6 +2,7 @@
 #define ESPMISSINGINCLUDES_H
 
 #include <stdint.h>
+#include <stdarg.h>
 #include <c_types.h>
 
 
@@ -71,6 +72,10 @@ void pvPortFree(void *ptr, const char *file, int line);
                                      |( (((FUNC&BIT2)<<2)|(FUNC&0x3))<<PERIPHS_IO_MUX_FUNC_S) );  \
     } while (0)
 #endif
+
+int ets_vsprintf(char *str, const char *format, va_list argptr);
+int ets_vsnprintf(char *buffer, size_t sizeOfBuffer,  const char *format, va_list argptr);
+int os_snprintf(char *str, size_t size, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 #endif
 

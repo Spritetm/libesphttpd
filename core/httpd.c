@@ -51,6 +51,7 @@ struct HttpdPriv {
 	int headPos;
 	char *sendBuff;
 	int sendBuffLen;
+    int sendBuffMax;
 	char *chunkHdr;
 	HttpSendBacklogItem *sendBacklog;
 	int sendBacklogSize;
@@ -229,15 +230,27 @@ void ICACHE_FLASH_ATTR httpdDisableTransferEncoding(HttpdConnData *conn) {
 	conn->priv->flags&=~HFL_CHUNKED;
 }
 
+//Setup a send buffer
+void ICACHE_FLASH_ATTR httpdSetSendBuffer(HttpdConnData *conn, char *buff, short max)
+{
+  conn->priv->sendBuff = buff;
+  conn->priv->sendBuffLen = 0;
+  conn->priv->sendBuffMax = max;
+}
+
 //Start the response headers.
 void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
 	char buff[256];
 	int l;
-	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\n%s\r\n", 
+	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\n", 
 			(conn->priv->flags&HFL_HTTP11)?1:0, 
-			code, 
-			(conn->priv->flags&HFL_CHUNKED)?"Transfer-Encoding: chunked":"Connection: close");
+			code);
 	httpdSend(conn, buff, l);
+    if (code != 101) {
+	    l=sprintf(buff, "%s\r\n", 
+			    (conn->priv->flags&HFL_CHUNKED)?"Transfer-Encoding: chunked":"Connection: close");
+	    httpdSend(conn, buff, l);
+    }
 }
 
 //Send a http header.
@@ -352,13 +365,13 @@ int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) 
 	if (len<0) len=strlen(data);
 	if (len==0) return 0;
 	if (conn->priv->flags&HFL_CHUNKED && conn->priv->flags&HFL_SENDINGBODY && conn->priv->chunkHdr==NULL) {
-		if (conn->priv->sendBuffLen+len+6>MAX_SENDBUFF_LEN) return 0;
+		if (conn->priv->sendBuffLen+len+6>conn->priv->sendBuffMax) return 0;
 		//Establish start of chunk
 		conn->priv->chunkHdr=&conn->priv->sendBuff[conn->priv->sendBuffLen];
 		strcpy(conn->priv->chunkHdr, "0000\r\n");
 		conn->priv->sendBuffLen+=6;
 	}
-	if (conn->priv->sendBuffLen+len>MAX_SENDBUFF_LEN) return 0;
+	if (conn->priv->sendBuffLen+len>conn->priv->sendBuffMax) return 0;
 	memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
 	conn->priv->sendBuffLen+=len;
 	return 1;
@@ -476,6 +489,8 @@ void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) 
 	sendBuff=malloc(MAX_SENDBUFF_LEN);
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
+    conn->priv->sendBuffMax = MAX_SENDBUFF_LEN;
+
 	r=conn->cgi(conn); //Execute cgi fn.
 	if (r==HTTPD_CGI_DONE) {
 		httpdCgiIsDone(conn);
@@ -581,7 +596,7 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 		e++; //Skip to protocol indicator
 		while (*e==' ') e++; //Skip spaces.
 		//If HTTP/1.1, note that and set chunked encoding
-		if (strcasecmp(e, "HTTP/1.1")==0) conn->priv->flags|=HFL_HTTP11|HFL_CHUNKED;
+		if (strcasecmp(e, "HTTP/1.1")==0) conn->priv->flags|=HFL_HTTP11; // BUG -- dbetz |HFL_CHUNKED;
 
 		httpd_printf("URL = %s\n", conn->url);
 		//Parse out the URL part before the GET parameters.
@@ -639,6 +654,7 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 	if (conn==NULL) return;
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
+    conn->priv->sendBuffMax = MAX_SENDBUFF_LEN;
 
 	//This is slightly evil/dirty: we abuse conn->post->len as a state variable for where in the http communications we are:
 	//<0 (-1): Post len unknown because we're still receiving headers

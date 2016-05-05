@@ -34,7 +34,8 @@ XTENSA_TOOLS_ROOT ?=
 
 # base directory of the ESP8266 SDK package, absolute
 # Only used for the non-FreeRTOS build
-SDK_BASE	?= /opt/Espressif/ESP8266_SDK
+#SDK_BASE	?= /opt/Espressif/ESP8266_SDK
+SDK_BASE	?= $(abspath ../esp_iot_sdk_v1.5.2)
 
 # Base directory of the ESP8266 FreeRTOS SDK package, absolute
 # Only used for the FreeRTOS build
