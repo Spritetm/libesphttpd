@@ -126,19 +126,20 @@ int ICACHE_FLASH_ATTR cgiWebsockBroadcast(char *resource, char *data, int len, i
 //will not have an associated send buffer. This means httpdSend will write to a dangling pointer!
 //Disabled for now. If you really need this, open an issue on github or otherwise poke me and I'll
 //see what I can do.
-/*
-	Websock *lw=llStart;
 	int ret=0;
+#if 1
+	Websock *lw=llStart;
 	while (lw!=NULL) {
+        char sendBuff[1024];
+        httpdSetSendBuffer(lw->conn, sendBuff, sizeof(sendBuff));
 		if (strcmp(lw->conn->url, resource)==0) {
 			cgiWebsocketSend(lw, data, len, flags);
 			ret++;
 		}
 		lw=lw->priv->next;
 	}
+#endif
 	return ret;
-*/
-	return 0;
 }
 
 
