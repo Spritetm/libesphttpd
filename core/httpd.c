@@ -44,6 +44,7 @@ struct HttpSendBacklogItem {
 #define HFL_CHUNKED (1<<1)
 #define HFL_SENDINGBODY (1<<2)
 #define HFL_DISCONAFTERSENT (1<<3)
+#define HFL_NOCONNECTIONSTR (1<<4)
 
 //Private data for http connection
 struct HttpdPriv {
@@ -82,6 +83,8 @@ static const ICACHE_RODATA_ATTR MimeMap mimeTypes[]={
 	{"jpeg", "image/jpeg"},
 	{"png", "image/png"},
 	{"svg", "image/svg+xml"},
+	{"xml", "text/xml"},
+	{"json", "application/json"},
 	{NULL, "text/html"}, //default value
 };
 
@@ -223,20 +226,30 @@ int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *re
 	return 0;
 }
 
-//Call before calling httpdStartResponse to disable automatically-chosen transfer
-//encodings (specifically, for now, chunking) and fall back on Connection: Close.
-void ICACHE_FLASH_ATTR httpdDisableTransferEncoding(HttpdConnData *conn) {
-	conn->priv->flags&=~HFL_CHUNKED;
+void ICACHE_FLASH_ATTR httdSetTransferMode(HttpdConnData *conn, int mode) {
+	if (mode==HTTPD_TRANSFER_CLOSE) {
+		conn->priv->flags&=~HFL_CHUNKED;
+		conn->priv->flags&=~HFL_NOCONNECTIONSTR;
+	} else if (mode==HTTPD_TRANSFER_CHUNKED) {
+		conn->priv->flags|=HFL_CHUNKED;
+		conn->priv->flags&=~HFL_NOCONNECTIONSTR;
+	} else if (mode==HTTPD_TRANSFER_NONE) {
+		conn->priv->flags&=~HFL_CHUNKED;
+		conn->priv->flags|=HFL_NOCONNECTIONSTR;
+	}
 }
 
 //Start the response headers.
 void ICACHE_FLASH_ATTR httpdStartResponse(HttpdConnData *conn, int code) {
 	char buff[256];
 	int l;
-	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\n%s\r\n", 
+	const char *connStr="Connection: close\r\n";
+	if (conn->priv->flags&HFL_CHUNKED) connStr="Transfer-Encoding: chunked\r\n";
+	if (conn->priv->flags&HFL_NOCONNECTIONSTR) connStr="";
+	l=sprintf(buff, "HTTP/1.%d %d OK\r\nServer: esp8266-httpd/"HTTPDVER"\r\n%s", 
 			(conn->priv->flags&HFL_HTTP11)?1:0, 
 			code, 
-			(conn->priv->flags&HFL_CHUNKED)?"Transfer-Encoding: chunked":"Connection: close");
+			connStr);
 	httpdSend(conn, buff, l);
 }
 
