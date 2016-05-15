@@ -82,6 +82,8 @@ static const ICACHE_RODATA_ATTR MimeMap mimeTypes[]={
 	{"jpeg", "image/jpeg"},
 	{"png", "image/png"},
 	{"svg", "image/svg+xml"},
+	{"xml", "text/xml"},
+	{"json", "application/json"},
 	{NULL, "text/html"}, //default value
 };
 
