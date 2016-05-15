@@ -15,13 +15,14 @@ Thanks to my collague at Espressif for writing the foundations of this code.
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 
 #include "lwip/lwip/sockets.h"
 
 
 static int httpPort;
 static int httpMaxConnCt;
-static SemaphoreHandle_t httpdMux;
+static xQueueHandle httpdMux;
 
 
 struct  RtosConnType{
@@ -73,7 +74,7 @@ static void platHttpServerTask(void *pvParameters) {
 	struct sockaddr_in server_addr;
 	struct sockaddr_in remote_addr;
 	
-	httpdMux=xSemaphoreCreateRecursiveMutex(void);
+	httpdMux=xSemaphoreCreateRecursiveMutex();
 	
 	for (x=0; x<HTTPD_MAX_CONNECTIONS; x++) {
 		rconn[x].fd=-1;
