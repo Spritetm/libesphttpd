@@ -448,8 +448,14 @@ void ICACHE_FLASH_ATTR httpdCgiIsDone(HttpdConnData *conn) {
 //Callback called when the data on a socket has been successfully
 //sent.
 void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) {
-	int r;
 	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
+	httpdContinue(conn);
+}
+
+//Can be called after a CGI function has returned HTTPD_CGI_MORE to
+//resume handling an open connection asynchronously
+void ICACHE_FLASH_ATTR httpdContinue(HttpdConnData * conn) {
+	int r;
 	char *sendBuff;
 
 	if (conn==NULL) return;
