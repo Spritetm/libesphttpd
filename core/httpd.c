@@ -638,9 +638,24 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 	}
 }
 
+//Make a connection 'live' so we can do all the things a cgi can do to it.
+//ToDo: Also make httpdRecvCb/httpdContinue use these?
+void ICACHE_FLASH_ATTR httpdConnSendStart(HttpdConnData *conn) {
+	httpdPlatLock();
+	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
+	conn->priv->sendBuff=sendBuff;
+	conn->priv->sendBuffLen=0;
+}
+
+//Finish the live-ness of a connection. Always call this after httpdConnStart
+void ICACHE_FLASH_ATTR httpdConnSendFinish(HttpdConnData *conn) {
+	if (conn->conn) httpdFlushSendBuffer(conn);
+	free(conn->priv->sendBuff);
+	httpdPlatUnlock();
+}
 
 //Callback called when there's data available on a socket.
-void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsigned short len) {
+void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsigned short len) {
 	int x, r;
 	char *p, *e;
 	httpdPlatLock();

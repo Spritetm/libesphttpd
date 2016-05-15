@@ -121,24 +121,18 @@ int ICACHE_FLASH_ATTR cgiWebsocketSend(Websock *ws, char *data, int len, int fla
 
 //Broadcast data to all websockets at a specific url. Returns the amount of connections sent to.
 int ICACHE_FLASH_ATTR cgiWebsockBroadcast(char *resource, char *data, int len, int flags) {
-//This is majorly broken (and actually, always, it just tended to work because the circumstances
-//were juuuust right). Because the socket is used outside of the httpd send/receive context, it 
-//will not have an associated send buffer. This means httpdSend will write to a dangling pointer!
-//Disabled for now. If you really need this, open an issue on github or otherwise poke me and I'll
-//see what I can do.
-/*
 	Websock *lw=llStart;
 	int ret=0;
 	while (lw!=NULL) {
 		if (strcmp(lw->conn->url, resource)==0) {
+			httpdConnSendStart(lw->conn);
 			cgiWebsocketSend(lw, data, len, flags);
+			httpdConnSendFinish(lw->conn);
 			ret++;
 		}
 		lw=lw->priv->next;
 	}
 	return ret;
-*/
-	return 0;
 }
 
 

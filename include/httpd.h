@@ -71,7 +71,8 @@ int httpdGetHeader(HttpdConnData *conn, char *header, char *ret, int retLen);
 int httpdSend(HttpdConnData *conn, const char *data, int len);
 void httpdFlushSendBuffer(HttpdConnData *conn);
 void httpdContinue(HttpdConnData *conn);
-
+void httpdConnSendStart(HttpdConnData *conn);
+void httpdConnSendFinish(HttpdConnData *conn);
 
 //Platform dependent code should call these.
 void httpdSentCb(ConnTypePtr conn, char *remIp, int remPort);

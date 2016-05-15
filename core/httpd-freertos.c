@@ -21,6 +21,8 @@ Thanks to my collague at Espressif for writing the foundations of this code.
 
 static int httpPort;
 static int httpMaxConnCt;
+static SemaphoreHandle_t httpdMux;
+
 
 struct  RtosConnType{
 	int fd;
@@ -47,10 +49,12 @@ void httpdPlatDisableTimeout(ConnTypePtr conn) {
 }
 
 //Set/clear global httpd lock.
-//ToDo: implement this
 void ICACHE_FLASH_ATTR httpdPlatLock() {
+	xSemaphoreTakeRecursive(httpdMux, portMAX_DELAY);
 }
+
 void ICACHE_FLASH_ATTR httpdPlatUnlock() {
+	xSemaphoreGiveRecursive(httpdMux);
 }
 
 
@@ -68,7 +72,9 @@ static void platHttpServerTask(void *pvParameters) {
 	//struct timeval timeout;
 	struct sockaddr_in server_addr;
 	struct sockaddr_in remote_addr;
-
+	
+	httpdMux=xSemaphoreCreateRecursiveMutex(void);
+	
 	for (x=0; x<HTTPD_MAX_CONNECTIONS; x++) {
 		rconn[x].fd=-1;
 	}
