@@ -482,17 +482,22 @@ void ICACHE_FLASH_ATTR httpdContinue(HttpdConnData * conn) {
 		conn->priv->sendBacklogSize-=conn->priv->sendBacklog->len;
 		free(conn->priv->sendBacklog);
 		conn->priv->sendBacklog=next;
+		httpdPlatUnlock();
 		return;
 	}
 
 	if (conn->priv->flags&HFL_DISCONAFTERSENT) { //Marked for destruction?
 		httpd_printf("Pool slot %d is done. Closing.\n", conn->slot);
 		httpdPlatDisconnect(conn->conn);
+		httpdPlatUnlock();
 		return; //No need to call httpdFlushSendBuffer.
 	}
 
 	//If we don't have a CGI function, there's nothing to do but wait for something from the client.
-	if (conn->cgi==NULL) return;
+	if (conn->cgi==NULL) {
+		httpdPlatUnlock();
+		return;
+	}
 
 	sendBuff=malloc(MAX_SENDBUFF_LEN);
 	conn->priv->sendBuff=sendBuff;
@@ -674,7 +679,10 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 	httpdPlatLock();
 	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
 	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
-	if (conn==NULL) return;
+	if (conn==NULL) {
+		httpdPlatUnlock();
+		return;
+	}
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
 
@@ -762,7 +770,10 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort) {
 	httpdPlatLock();
 	HttpdConnData *hconn=httpdFindConnData(rconn, remIp, remPort);
-	if (hconn==NULL) return;
+	if (hconn==NULL) {
+		httpdPlatUnlock();
+		return;
+	}
 	httpd_printf("Pool slot %d: socket closed.\n", hconn->slot);
 	hconn->conn=NULL; //indicate cgi the connection is gone
 	if (hconn->cgi) hconn->cgi(hconn); //Execute cgi fn if needed
@@ -779,6 +790,7 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 	httpd_printf("Conn req from  %d.%d.%d.%d:%d, using pool slot %d\n", remIp[0]&0xff, remIp[1]&0xff, remIp[2]&0xff, remIp[3]&0xff, remPort, i);
 	if (i==HTTPD_MAX_CONNECTIONS) {
 		httpd_printf("Aiee, conn pool overflow!\n");
+		httpdPlatUnlock();
 		return 0;
 	}
 	connData[i]=malloc(sizeof(HttpdConnData));
