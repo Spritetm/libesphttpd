@@ -64,6 +64,7 @@ int httpdFindArg(char *line, char *arg, char *buff, int buffLen);
 void httpdInit(HttpdBuiltInUrl *fixedUrls, int port);
 const char *httpdGetMimetype(char *url);
 void httpdDisableTransferEncoding(HttpdConnData *conn);
+void httpdNoAutoConnectionHeader(HttpdConnData *conn);
 void httpdStartResponse(HttpdConnData *conn, int code);
 void httpdHeader(HttpdConnData *conn, const char *field, const char *val);
 void httpdEndHeaders(HttpdConnData *conn);
