@@ -46,6 +46,13 @@ void httpdPlatDisableTimeout(ConnTypePtr conn) {
 	//Unimplemented for FreeRTOS
 }
 
+//Set/clear global httpd lock.
+//ToDo: implement this
+void ICACHE_FLASH_ATTR httpdPlatLock() {
+}
+void ICACHE_FLASH_ATTR httpdPlatUnlock() {
+}
+
 
 #define RECV_BUF_SIZE 2048
 static void platHttpServerTask(void *pvParameters) {

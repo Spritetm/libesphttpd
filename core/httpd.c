@@ -448,8 +448,16 @@ void ICACHE_FLASH_ATTR httpdCgiIsDone(HttpdConnData *conn) {
 //Callback called when the data on a socket has been successfully
 //sent.
 void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) {
-	int r;
 	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
+	httpdContinue(conn);
+}
+
+//Can be called after a CGI function has returned HTTPD_CGI_MORE to
+//resume handling an open connection asynchronously
+void ICACHE_FLASH_ATTR httpdContinue(HttpdConnData * conn) {
+	int r;
+	httpdPlatLock();
+
 	char *sendBuff;
 
 	if (conn==NULL) return;
@@ -486,6 +494,7 @@ void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) 
 	}
 	httpdFlushSendBuffer(conn);
 	free(sendBuff);
+	httpdPlatUnlock();
 }
 
 //This is called when the headers have been received and the connection is ready to send
@@ -634,6 +643,7 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsigned short len) {
 	int x, r;
 	char *p, *e;
+	httpdPlatLock();
 	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
 	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
 	if (conn==NULL) return;
@@ -716,22 +726,26 @@ void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsign
 	}
 	if (conn->conn) httpdFlushSendBuffer(conn);
 	free(sendBuff);
+	httpdPlatUnlock();
 }
 
 //The platform layer should ALWAYS call this function, regardless if the connection is closed by the server
 //or by the client.
 void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort) {
+	httpdPlatLock();
 	HttpdConnData *hconn=httpdFindConnData(rconn, remIp, remPort);
 	if (hconn==NULL) return;
 	httpd_printf("Pool slot %d: socket closed.\n", hconn->slot);
 	hconn->conn=NULL; //indicate cgi the connection is gone
 	if (hconn->cgi) hconn->cgi(hconn); //Execute cgi fn if needed
 	httpdRetireConn(hconn);
+	httpdPlatUnlock();
 }
 
 
 int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort) {
 	int i;
+	httpdPlatLock();
 	//Find empty conndata in pool
 	for (i=0; i<HTTPD_MAX_CONNECTIONS; i++) if (connData[i]==NULL) break;
 	httpd_printf("Conn req from  %d.%d.%d.%d:%d, using pool slot %d\n", remIp[0]&0xff, remIp[1]&0xff, remIp[2]&0xff, remIp[3]&0xff, remPort, i);
@@ -758,6 +772,7 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 	connData[i]->priv->sendBacklogSize=0;
 	memcpy(connData[i]->remote_ip, remIp, 4);
 
+	httpdPlatUnlock();
 	return 1;
 }
 
