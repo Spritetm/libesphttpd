@@ -646,7 +646,7 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 
 
 //Callback called when there's data available on a socket.
-void httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsigned short len) {
+void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, char *data, unsigned short len) {
 	int x, r;
 	char *p, *e;
 	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
