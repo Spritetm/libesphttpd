@@ -22,7 +22,12 @@ void ICACHE_FLASH_ATTR httpdPlatUnlock() {
 
 
 static void ICACHE_FLASH_ATTR platReconCb(void *arg, sint8 err) {
-	//Yeah, this is pretty useless...
+	//From ESP8266 SDK
+	//If still no response, considers it as TCP connection broke, goes into espconn_reconnect_callback.
+
+	ConnTypePtr conn=arg;
+	//Just call disconnect to clean up pool and close connection.
+	httpdDisconCb(conn, (char*)conn->proto.tcp->remote_ip, conn->proto.tcp->remote_port);
 }
 
 static void ICACHE_FLASH_ATTR platDisconCb(void *arg) {
