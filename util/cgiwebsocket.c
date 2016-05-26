@@ -301,9 +301,19 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 				//Seems like a WebSocket connection.
 				// Alloc structs
 				connData->cgiData=malloc(sizeof(Websock));
+				if (connData->cgiData==NULL) {
+					httpd_printf("Can't allocate mem for websocket\n");
+					return HTTPD_CGI_DONE;
+				}
 				memset(connData->cgiData, 0, sizeof(Websock));
 				Websock *ws=(Websock*)connData->cgiData;
 				ws->priv=malloc(sizeof(WebsockPriv));
+				if (ws->priv==NULL) {
+					httpd_printf("Can't allocate mem for websocket priv\n");
+					free(connData->cgiData);
+					connData->cgiData=NULL;
+					return HTTPD_CGI_DONE;
+				}
 				memset(ws->priv, 0, sizeof(WebsockPriv));
 				ws->conn=connData;
 				//Reply with the right headers.

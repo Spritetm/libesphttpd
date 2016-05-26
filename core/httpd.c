@@ -326,6 +326,10 @@ int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
 	if (strcmp(connData->hostName, (char*)connData->cgiArg)==0) return HTTPD_CGI_NOTFOUND;
 	//Not the same. Redirect to real hostname.
 	buff=malloc(strlen((char*)connData->cgiArg)+sizeof(hostFmt));
+	if (buff==NULL) {
+		//Bail out
+		return HTTPD_CGI_DONE;
+	}
 	sprintf(buff, hostFmt, (char*)connData->cgiArg);
 	httpd_printf("Redirecting to hostname url %s\n", buff);
 	httpdRedirect(connData, buff);
@@ -500,6 +504,11 @@ void ICACHE_FLASH_ATTR httpdContinue(HttpdConnData * conn) {
 	}
 
 	sendBuff=malloc(MAX_SENDBUFF_LEN);
+	if (sendBuff==NULL) {
+		httpd_printf("Malloc of sendBuff failed!\n");
+		httpdPlatUnlock();
+		return;
+	}
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
 	r=conn->cgi(conn); //Execute cgi fn.
@@ -641,6 +650,10 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 		}
 		httpd_printf("Mallocced buffer for %d + 1 bytes of post data.\n", conn->post->buffSize);
 		conn->post->buff=(char*)malloc(conn->post->buffSize + 1);
+		if (conn->post->buff==NULL) {
+			printf("...failed!\n");
+			return;
+		}
 		conn->post->buffLen=0;
 	} else if (strncmp(h, "Content-Type: ", 14)==0) {
 		if (strstr(h, "multipart/form-data")) {
@@ -658,9 +671,14 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 
 //Make a connection 'live' so we can do all the things a cgi can do to it.
 //ToDo: Also make httpdRecvCb/httpdContinue use these?
+//ToDo: Fail if malloc fails?
 void ICACHE_FLASH_ATTR httpdConnSendStart(HttpdConnData *conn) {
 	httpdPlatLock();
 	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
+	if (sendBuff==NULL) {
+		printf("Malloc sendBuff failed!\n");
+		return;
+	}
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
 }
@@ -678,6 +696,12 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 	char *p, *e;
 	httpdPlatLock();
 	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
+	if (sendBuff==NULL) {
+		printf("Malloc sendBuff failed!\n");
+		httpdPlatUnlock();
+		return;
+	}
+
 	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
 	if (conn==NULL) {
 		httpdPlatUnlock();
@@ -794,6 +818,11 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 		return 0;
 	}
 	connData[i]=malloc(sizeof(HttpdConnData));
+	if (connData[i]==NULL) {
+		printf("Out of memory allocating connData!\n");
+		httpdPlatUnlock();
+		return 0;
+	}
 	memset(connData[i], 0, sizeof(HttpdConnData));
 	connData[i]->priv=malloc(sizeof(HttpdPriv));
 	memset(connData[i]->priv, 0, sizeof(HttpdPriv));
@@ -801,6 +830,11 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 	connData[i]->slot=i;
 	connData[i]->priv->headPos=0;
 	connData[i]->post=malloc(sizeof(HttpdPostData));
+	if (connData[i]->post==NULL) {
+		printf("Out of memory allocating connData post struct!\n");
+		httpdPlatUnlock();
+		return 0;
+	}
 	memset(connData[i]->post, 0, sizeof(HttpdPostData));
 	connData[i]->post->buff=NULL;
 	connData[i]->post->buffLen=0;

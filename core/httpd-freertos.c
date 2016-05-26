@@ -205,7 +205,12 @@ static void platHttpServerTask(void *pvParameters) {
 
 				if (FD_ISSET(rconn[x].fd, &readset)) {
 					precvbuf=(char*)malloc(RECV_BUF_SIZE);
-					if (precvbuf==NULL) httpd_printf("platHttpServerTask: memory exhausted!\n");
+					if (precvbuf==NULL) {
+						httpd_printf("platHttpServerTask: memory exhausted!\n");
+						httpdDisconCb(&rconn[x], rconn[x].ip, rconn[x].port);
+						close(rconn[x].fd);
+						rconn[x].fd=-1;
+					}
 					ret=recv(rconn[x].fd, precvbuf, RECV_BUF_SIZE,0);
 					if (ret > 0) {
 						//Data received. Pass to httpd.
