@@ -309,9 +309,10 @@ int ICACHE_FLASH_ATTR tplWlan(HttpdConnData *connData, char *token, void **arg) 
 	strcpy(buff, "Unknown");
 	if (strcmp(token, "WiFiMode")==0) {
 		x=wifi_get_opmode();
-		if (x==1) strcpy(buff, "Client");
-		if (x==2) strcpy(buff, "SoftAP");
-		if (x==3) strcpy(buff, "STA+AP");
+		if (x==1) strcpy(buff, "Station");
+		else if (x==2) strcpy(buff, "SoftAP");
+		else if (x==3) strcpy(buff, "Station+SoftAP");
+		else strcpy(buff, "(unknown)");
 	} else if (strcmp(token, "currSsid")==0) {
 		strcpy(buff, (char*)stconf.ssid);
 	} else if (strcmp(token, "WiFiPasswd")==0) {
