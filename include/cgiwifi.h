@@ -10,4 +10,6 @@ int cgiWiFiConnect(HttpdConnData *connData);
 int cgiWiFiSetMode(HttpdConnData *connData);
 int cgiWiFiConnStatus(HttpdConnData *connData);
 
+int wifiJoin(char *ssid, char *passwd);
+
 #endif

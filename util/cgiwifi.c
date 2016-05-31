@@ -228,6 +228,22 @@ int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 	return HTTPD_CGI_DONE;
 }
 
+int ICACHE_FLASH_ATTR wifiJoin(char *ssid, char *passwd)
+{
+	static os_timer_t reassTimer;
+
+	strncpy((char*)stconf.ssid, ssid, 32);
+	strncpy((char*)stconf.password, passwd, 64);
+	httpd_printf("Try to connect to AP %s pw %s\n", ssid, passwd);
+
+	//Schedule disconnect/connect
+	os_timer_disarm(&reassTimer);
+	os_timer_setfn(&reassTimer, reassTimerCb, NULL);
+	os_timer_arm(&reassTimer, 500, 0);
+	
+	return 0;
+}
+
 //This cgi uses the routines above to connect to a specific access point with the
 //given ESSID using the given password.
 int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
