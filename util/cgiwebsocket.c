@@ -324,7 +324,7 @@ int ICACHE_FLASH_ATTR cgiWebsocket(HttpdConnData *connData) {
 				httpdStartResponse(connData, 101);
 				httpdHeader(connData, "Upgrade", "websocket");
 				httpdHeader(connData, "Connection", "upgrade");
-				base64_encode(20, sha1_result(&s), sizeof(buff), buff);
+				user_base64_encode(20, sha1_result(&s), sizeof(buff), buff);
 				httpdHeader(connData, "Sec-WebSocket-Accept", buff);
 				httpdEndHeaders(connData);
 				//Set data receive handler
