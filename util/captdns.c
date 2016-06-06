@@ -255,7 +255,7 @@ static void ICACHE_FLASH_ATTR captdnsRecv(struct sockaddr_in *premote_addr, char
 	}
 	//Send the response
 #ifndef FREERTOS
-	remote_info *remInfo=NULL;
+	remot_info *remInfo=NULL;
 	//Send data to port/ip it came from, not to the ip/port we listen on.
 	if (espconn_get_connection_info(conn, &remInfo, 0)==ESPCONN_OK) {
 		conn->proto.udp->remote_port=remInfo->remote_port;
