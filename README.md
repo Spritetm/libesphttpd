@@ -24,7 +24,8 @@ with the SDK.
 
 Initializing libesphttpd is usually done in the `user_main()` of your project, but it is not mandatory
 to place the call here. Initialization is done by the `httpdInit(builtInUrls, port)` call. The port
-is the TCP port the webserver will listen on; the builtInUrls is the CGI list.
+is the TCP port the webserver will listen on; the builtInUrls is the CGI list. Only call the `httpdInit`
+once, calling it multiple times leads to undefined behaviour.
 
 (As an aside: CGI actually is an abbreviation for Common Gateway Interface, which is a specification
 to allow external processes to interface with a non-embedded webserver. The CGI functions mentioned here
