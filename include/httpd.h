@@ -69,6 +69,7 @@ void httpdHeader(HttpdConnData *conn, const char *field, const char *val);
 void httpdEndHeaders(HttpdConnData *conn);
 int httpdGetHeader(HttpdConnData *conn, char *header, char *ret, int retLen);
 int httpdSend(HttpdConnData *conn, const char *data, int len);
+int httpdUnbufferedSend(HttpdConnData *conn, const char *data, int len);
 void httpdSetSendBuffer(HttpdConnData *conn, char *buff, short max);
 void httpdFlushSendBuffer(HttpdConnData *conn);
 void httpdCgiIsDone(HttpdConnData *conn);

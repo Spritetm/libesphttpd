@@ -99,23 +99,11 @@ const char ICACHE_FLASH_ATTR *httpdGetMimetype(char *url) {
 	return mimeTypes[i].mimetype;
 }
 
-//Looks up the connData info for a specific connection
-static HttpdConnData ICACHE_FLASH_ATTR *httpdFindConnData(ConnTypePtr conn, char *remIp, int remPort) {
-	for (int i=0; i<HTTPD_MAX_CONNECTIONS; i++) {
-		if (connData[i] && connData[i]->remote_port == remPort &&
-						memcmp(connData[i]->remote_ip, remIp, 4) == 0) {
-			connData[i]->conn=conn;
-			return connData[i];
-		}
-	}
-	//Shouldn't happen.
-	httpd_printf("*** Unknown connection %d.%d.%d.%d:%d\n", remIp[0]&0xff, remIp[1]&0xff, remIp[2]&0xff, remIp[3]&0xff, remPort);
-	httpdPlatDisconnect(conn);
-	return NULL;
-}
-
 //Retires a connection for re-use
 static void ICACHE_FLASH_ATTR httpdRetireConn(HttpdConnData *conn) {
+    if (conn==NULL) return;
+    if (conn->conn && conn->conn->reverse == conn)
+        conn->conn->reverse = NULL; // break reverse link
 	if (conn->priv->sendBacklog!=NULL) {
 		HttpSendBacklogItem *i, *j;
 		i=conn->priv->sendBacklog;
@@ -125,13 +113,15 @@ static void ICACHE_FLASH_ATTR httpdRetireConn(HttpdConnData *conn) {
 			free(j);
 		} while (i!=NULL);
 	}
-	if (conn->post->buff!=NULL) free(conn->post->buff);
-	if (conn->post!=NULL) free(conn->post);
+	if (conn->post!=NULL) {
+	    if (conn->post->buff!=NULL) free(conn->post->buff);
+	    free(conn->post);
+	}
 	if (conn->priv!=NULL) free(conn->priv);
-	if (conn) free(conn);
 	for (int i=0; i<HTTPD_MAX_CONNECTIONS; i++) {
 		if (connData[i]==conn) connData[i]=NULL;
 	}
+	free(conn);
 }
 
 //Stupid li'l helper function that returns the value of a hex char.
@@ -363,7 +353,7 @@ int ICACHE_FLASH_ATTR cgiRedirectApClientToHostname(HttpdConnData *connData) {
 int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) {
 	if (conn->conn==NULL) return 0;
 	if (len<0) len=strlen(data);
-	if (len==0) return 0;
+	if (len==0) return 1;
 	if (conn->priv->flags&HFL_CHUNKED && conn->priv->flags&HFL_SENDINGBODY && conn->priv->chunkHdr==NULL) {
 		if (conn->priv->sendBuffLen+len+6>conn->priv->sendBuffMax) return 0;
 		//Establish start of chunk
@@ -387,7 +377,7 @@ static char ICACHE_FLASH_ATTR httpdHexNibble(int val) {
 //are doing! Also, if you do set conn->cgi to NULL to indicate the connection is closed, do it BEFORE
 //calling this.
 void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
-	int r, len;
+	int len;
 	if (conn->conn==NULL) return;
 	if (conn->priv->chunkHdr!=NULL) {
 		//We're sending chunked data, and the chunk needs fixing up.
@@ -408,22 +398,28 @@ void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
 		strcpy(&conn->priv->sendBuff[conn->priv->sendBuffLen], "0\r\n\r\n");
 		conn->priv->sendBuffLen+=5;
 	}
-	if (conn->priv->sendBuffLen!=0) {
-		r=httpdPlatSendData(conn->conn, conn->priv->sendBuff, conn->priv->sendBuffLen);
-		if (!r) {
+	if (!httpdUnbufferedSend(conn, conn->priv->sendBuff, conn->priv->sendBuffLen)) {
+	    httpd_printf("Httpd: UnbufferedSend failed!\n");
+	}
+	conn->priv->sendBuffLen=0;
+}
+
+int ICACHE_FLASH_ATTR httpdUnbufferedSend(HttpdConnData *conn, const char *data, int len) {
+	if (len!=0) {
+		if (!httpdPlatSendData(conn->conn, data, len)) {
+		    httpd_printf("Httpd: queuing %d byte buffer\n", len);
 			//Can't send this for some reason. Dump packet in backlog, we can send it later.
-			if (conn->priv->sendBacklogSize+conn->priv->sendBuffLen>MAX_BACKLOG_SIZE) {
-				httpd_printf("Httpd: Backlog: Exceeded max backlog size, dropped %d bytes instead of sending them.\n", conn->priv->sendBuffLen);
-				conn->priv->sendBuffLen=0;
-				return;
+			if (conn->priv->sendBacklogSize+len>MAX_BACKLOG_SIZE) {
+				httpd_printf("Httpd: Backlog: Exceeded max backlog size, dropped %d bytes instead of sending them.\n", len);
+				return 0;
 			}
-			HttpSendBacklogItem *i=malloc(sizeof(HttpSendBacklogItem)+conn->priv->sendBuffLen);
+			HttpSendBacklogItem *i=malloc(sizeof(HttpSendBacklogItem)+len);
 			if (i==NULL) {
 				httpd_printf("Httpd: Backlog: malloc failed, out of memory!\n");
-				return;
+				return 0;
 			}
-			memcpy(i->data, conn->priv->sendBuff, conn->priv->sendBuffLen);
-			i->len=conn->priv->sendBuffLen;
+			memcpy(i->data, data, len);
+			i->len=len;
 			i->next=NULL;
 			if (conn->priv->sendBacklog==NULL) {
 				conn->priv->sendBacklog=i;
@@ -432,10 +428,10 @@ void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
 				while (e->next!=NULL) e=e->next;
 				e->next=i;
 			}
-			conn->priv->sendBacklogSize+=conn->priv->sendBuffLen;
+			conn->priv->sendBacklogSize+=len;
 		}
-		conn->priv->sendBuffLen=0;
 	}
+	return 1;
 }
 
 void ICACHE_FLASH_ATTR httpdCgiIsDone(HttpdConnData *conn) {
@@ -462,12 +458,13 @@ void ICACHE_FLASH_ATTR httpdCgiIsDone(HttpdConnData *conn) {
 //sent.
 void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) {
 	int r;
-	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
+	HttpdConnData *conn=rconn->reverse;
 	char *sendBuff;
 
 	if (conn==NULL) return;
 
 	if (conn->priv->sendBacklog!=NULL) {
+	    httpd_printf("Httpd: sending %d byte queued buffer\n", conn->priv->sendBacklog->len);
 		//We have some backlog to send first.
 		HttpSendBacklogItem *next=conn->priv->sendBacklog->next;
 		httpdPlatSendData(conn->conn, conn->priv->sendBacklog->data, conn->priv->sendBacklog->len);
@@ -650,7 +647,7 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 	int x, r;
 	char *p, *e;
 	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
-	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
+	HttpdConnData *conn=rconn->reverse;
 	if (conn==NULL) return;
 	conn->priv->sendBuff=sendBuff;
 	conn->priv->sendBuffLen=0;
@@ -737,7 +734,7 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 //The platform layer should ALWAYS call this function, regardless if the connection is closed by the server
 //or by the client.
 void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort) {
-	HttpdConnData *hconn=httpdFindConnData(rconn, remIp, remPort);
+	HttpdConnData *hconn=rconn->reverse;
 	if (hconn==NULL) return;
 	httpd_printf("Pool slot %d: socket closed.\n", hconn->slot);
 	hconn->conn=NULL; //indicate cgi the connection is gone
@@ -760,6 +757,7 @@ int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort)
 	connData[i]->priv=malloc(sizeof(HttpdPriv));
 	memset(connData[i]->priv, 0, sizeof(HttpdPriv));
 	connData[i]->conn=conn;
+	conn->reverse = connData[i];
 	connData[i]->slot=i;
 	connData[i]->priv->headPos=0;
 	connData[i]->post=malloc(sizeof(HttpdPostData));

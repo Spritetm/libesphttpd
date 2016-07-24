@@ -158,19 +158,29 @@ int ICACHE_FLASH_ATTR cgiWiFiScan(HttpdConnData *connData) {
 //Temp store for new ap info.
 static struct station_config stconf;
 
+//#define SWITCH_TO_STA_MODE_AFTER_CONNECT
+
 //This routine is ran some time after a connection attempt to an access point. If
 //the connect succeeds, this gets the module in STA-only mode.
 static void ICACHE_FLASH_ATTR resetTimerCb(void *arg) {
 	int x=wifi_station_get_connect_status();
 	if (x==STATION_GOT_IP) {
+#ifdef SWITCH_TO_STA_MODE_AFTER_CONNECT
 		//Go to STA mode. This needs a reset, so do that.
 		httpd_printf("Got IP. Going into STA mode..\n");
 		wifi_set_opmode(1);
 		system_restart();
+#else
+		httpd_printf("Got IP address\n");
+#endif
 	} else {
 		connTryStatus=CONNTRY_FAIL;
+#ifdef SWITCH_TO_STA_MODE_AFTER_CONNECT
 		httpd_printf("Connect fail. Not going into STA-only mode.\n");
 		//Maybe also pass this through on the webpage?
+#else
+        httpd_printf("Connect failed.\n");
+#endif
 	}
 }
 
@@ -215,6 +225,8 @@ int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 	strncpy((char*)stconf.password, passwd, 64);
 	httpd_printf("Try to connect to AP %s pw %s\n", essid, passwd);
 
+    connTryStatus=CONNTRY_IDLE;
+    
 	//Schedule disconnect/connect
 	os_timer_disarm(&reassTimer);
 	os_timer_setfn(&reassTimer, reassTimerCb, NULL);
@@ -266,6 +278,15 @@ int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
 	httpdRedirect(connData, "/wifi");
 	return HTTPD_CGI_DONE;
 }
+
+/*
+ STATION_IDLE = 0,
+ STATION_CONNECTING,
+ STATION_WRONG_PASSWORD,
+ STATION_NO_AP_FOUND,
+ STATION_CONNECT_FAIL,
+ STATION_GOT_IP
+*/
 
 int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
 	char buff[1024];

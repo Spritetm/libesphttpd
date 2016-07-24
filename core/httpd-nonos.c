@@ -15,6 +15,7 @@ static esp_tcp httpdTcp;
 
 
 static void ICACHE_FLASH_ATTR platReconCb(void *arg, sint8 err) {
+os_printf("RECON: %d\n", err);
 	//Yeah, this is pretty useless...
 }
 
@@ -46,7 +47,7 @@ static void ICACHE_FLASH_ATTR platConnCb(void *arg) {
 }
 
 
-int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
+int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, const char *buff, int len) {
 	int r;
 	r=espconn_sent(conn, (uint8_t*)buff, len);
 	return (r>=0);

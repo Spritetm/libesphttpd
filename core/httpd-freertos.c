@@ -32,7 +32,7 @@ struct  RtosConnType{
 
 static RtosConnType rconn[HTTPD_MAX_CONNECTIONS];
 
-int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
+int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, const char *buff, int len) {
 	conn->needWriteDoneNotif=1;
 	return (write(conn->fd, buff, len)>=0);
 }
