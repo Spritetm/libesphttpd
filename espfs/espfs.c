@@ -195,7 +195,10 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 
 //Read len bytes from the given file into buff. Returns the actual amount of bytes read.
 int ICACHE_FLASH_ATTR espFsRead(EspFsFile *fh, char *buff, int len) {
-	int flen, fdlen;
+	int flen;
+#ifdef ESPFS_HEATSHRINK
+	int fdlen;
+#endif
 	if (fh==NULL) return 0;
 		
 	readFlashUnaligned((char*)&flen, (char*)&fh->header->fileLenComp, 4);
