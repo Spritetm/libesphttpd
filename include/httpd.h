@@ -3,6 +3,17 @@
 
 #define HTTPDVER "0.4"
 
+//Max length of request head. This is statically allocated for each connection.
+#define HTTPD_MAX_HEAD_LEN		1024
+//Max post buffer len. This is dynamically malloc'ed if needed.
+#define HTTPD_MAX_POST_LEN		2048
+//Max send buffer len. This is allocated on the stack.
+#define HTTPD_MAX_SENDBUFF_LEN	2048
+//If some data can't be sent because the underlaying socket doesn't accept the data (like the nonos
+//layer is prone to do), we put it in a backlog that is dynamically malloc'ed. This defines the max
+//size of the backlog.
+#define HTTPD_MAX_BACKLOG_SIZE	(4*1024)
+
 #define HTTPD_CGI_MORE 0
 #define HTTPD_CGI_DONE 1
 #define HTTPD_CGI_NOTFOUND 2

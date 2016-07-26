@@ -37,9 +37,17 @@ int ICACHE_FLASH_ATTR cgiEspFsHook(HttpdConnData *connData) {
 		return HTTPD_CGI_DONE;
 	}
 
+	//First call to this cgi.
 	if (file==NULL) {
-		//First call to this cgi. Open the file so we can read it.
-		file=espFsOpen(connData->url);
+		if (connData->cgiArg != NULL) {
+			//Open a different file than provided in http request.
+			//Common usage: {"/", cgiEspFsHook, "/index.html"} will show content of index.html without actual redirect to that file if host root was requested
+			file = espFsOpen((char*)connData->cgiArg);
+		} else {
+			//Open the file so we can read it.
+			file = espFsOpen(connData->url);
+		}
+
 		if (file==NULL) {
 			return HTTPD_CGI_NOTFOUND;
 		}

@@ -16,18 +16,6 @@ Esp8266 http server - core routines
 #include "httpd.h"
 #include "httpd-platform.h"
 
-
-//Max length of request head. This is statically allocated for each connection.
-#define MAX_HEAD_LEN 1024
-//Max post buffer len. This is dynamically malloc'ed if needed.
-#define MAX_POST 1024
-//Max send buffer len. This is allocated on the stack.
-#define MAX_SENDBUFF_LEN 2048
-//If some data can't be sent because the underlaying socket doesn't accept the data (like the nonos
-//layer is prone to do), we put it in a backlog that is dynamically malloc'ed. This defines the max
-//size of the backlog.
-#define MAX_BACKLOG_SIZE (4*1024)
-
 //This gets set at init time.
 static HttpdBuiltInUrl *builtInUrls;
 
@@ -48,7 +36,7 @@ struct HttpSendBacklogItem {
 
 //Private data for http connection
 struct HttpdPriv {
-	char head[MAX_HEAD_LEN];
+	char head[HTTPD_MAX_HEAD_LEN];
 	int headPos;
 	char *sendBuff;
 	int sendBuffLen;
@@ -369,13 +357,13 @@ int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len) 
 	if (len<0) len=strlen(data);
 	if (len==0) return 0;
 	if (conn->priv->flags&HFL_CHUNKED && conn->priv->flags&HFL_SENDINGBODY && conn->priv->chunkHdr==NULL) {
-		if (conn->priv->sendBuffLen+len+6>MAX_SENDBUFF_LEN) return 0;
+		if (conn->priv->sendBuffLen+len+6>HTTPD_MAX_SENDBUFF_LEN) return 0;
 		//Establish start of chunk
 		conn->priv->chunkHdr=&conn->priv->sendBuff[conn->priv->sendBuffLen];
 		strcpy(conn->priv->chunkHdr, "0000\r\n");
 		conn->priv->sendBuffLen+=6;
 	}
-	if (conn->priv->sendBuffLen+len>MAX_SENDBUFF_LEN) return 0;
+	if (conn->priv->sendBuffLen+len>HTTPD_MAX_SENDBUFF_LEN) return 0;
 	memcpy(conn->priv->sendBuff+conn->priv->sendBuffLen, data, len);
 	conn->priv->sendBuffLen+=len;
 	return 1;
@@ -416,7 +404,7 @@ void ICACHE_FLASH_ATTR httpdFlushSendBuffer(HttpdConnData *conn) {
 		r=httpdPlatSendData(conn->conn, conn->priv->sendBuff, conn->priv->sendBuffLen);
 		if (!r) {
 			//Can't send this for some reason. Dump packet in backlog, we can send it later.
-			if (conn->priv->sendBacklogSize+conn->priv->sendBuffLen>MAX_BACKLOG_SIZE) {
+			if (conn->priv->sendBacklogSize+conn->priv->sendBuffLen>HTTPD_MAX_BACKLOG_SIZE) {
 				httpd_printf("Httpd: Backlog: Exceeded max backlog size, dropped %d bytes instead of sending them.\n", conn->priv->sendBuffLen);
 				conn->priv->sendBuffLen=0;
 				return;
@@ -503,7 +491,7 @@ void ICACHE_FLASH_ATTR httpdContinue(HttpdConnData * conn) {
 		return;
 	}
 
-	sendBuff=malloc(MAX_SENDBUFF_LEN);
+	sendBuff=malloc(HTTPD_MAX_SENDBUFF_LEN);
 	if (sendBuff==NULL) {
 		httpd_printf("Malloc of sendBuff failed!\n");
 		httpdPlatUnlock();
@@ -642,9 +630,9 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 		conn->post->len=atoi(h+i);
 
 		// Allocate the buffer
-		if (conn->post->len > MAX_POST) {
+		if (conn->post->len > HTTPD_MAX_POST_LEN) {
 			// we'll stream this in in chunks
-			conn->post->buffSize = MAX_POST;
+			conn->post->buffSize = HTTPD_MAX_POST_LEN;
 		} else {
 			conn->post->buffSize = conn->post->len;
 		}
@@ -674,7 +662,7 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 //ToDo: Fail if malloc fails?
 void ICACHE_FLASH_ATTR httpdConnSendStart(HttpdConnData *conn) {
 	httpdPlatLock();
-	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
+	char *sendBuff=malloc(HTTPD_MAX_SENDBUFF_LEN);
 	if (sendBuff==NULL) {
 		printf("Malloc sendBuff failed!\n");
 		return;
@@ -695,7 +683,7 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 	int x, r;
 	char *p, *e;
 	httpdPlatLock();
-	char *sendBuff=malloc(MAX_SENDBUFF_LEN);
+	char *sendBuff=malloc(HTTPD_MAX_SENDBUFF_LEN);
 	if (sendBuff==NULL) {
 		printf("Malloc sendBuff failed!\n");
 		httpdPlatUnlock();
@@ -726,7 +714,7 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 				}
 			}
 			//ToDo: return http error code 431 (request header too long) if this happens
-			if (conn->priv->headPos!=MAX_HEAD_LEN) conn->priv->head[conn->priv->headPos++]=data[x];
+			if (conn->priv->headPos!=HTTPD_MAX_HEAD_LEN) conn->priv->head[conn->priv->headPos++]=data[x];
 			conn->priv->head[conn->priv->headPos]=0;
 			//Scan for /r/n/r/n. Receiving this indicate the headers end.
 			if (data[x]=='\n' && (char *)strstr(conn->priv->head, "\r\n\r\n")!=NULL) {
