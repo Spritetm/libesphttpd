@@ -107,9 +107,9 @@ static void ICACHE_FLASH_ATTR wifiStartScan() {
 	wifi_station_scan(NULL, wifiScanDoneCb);
 }
 
-//This CGI is called from the bit of AJAX-code in wifi.tpl. It will initiate a
+//This CGI is called from the bit of AJAX-code in wifi.html. It will initiate a
 //scan for access points and if available will return the result of an earlier scan.
-//The result is embedded in a bit of JSON parsed by the javascript in wifi.tpl.
+//The result is embedded in a bit of JSON parsed by the javascript in wifi.html.
 int ICACHE_FLASH_ATTR cgiWiFiScan(HttpdConnData *connData) {
 	int pos=(int)connData->cgiData;
 	int len;
@@ -256,6 +256,25 @@ int ICACHE_FLASH_ATTR wifiJoin(char *ssid, char *passwd)
 	return 0;
 }
 
+#ifndef DEMO_MODE
+static os_timer_t setModeTimer;
+static int newMode;
+
+static void ICACHE_FLASH_ATTR setModeCb(void *arg) {
+    switch (newMode) {
+    case STATION_MODE:
+    case SOFTAP_MODE:
+    case STATIONAP_MODE:
+        wifi_set_opmode(newMode);
+        system_restart();
+        break;
+    default:
+        os_printf("setModeCb: invalid mode %d\n", newMode);
+        break;
+    }
+}
+#endif
+
 //This cgi uses the routines above to connect to a specific access point with the
 //given ESSID using the given password.
 int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
@@ -269,10 +288,19 @@ int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
 
 	len=httpdFindArg(connData->getArgs, "mode", buff, sizeof(buff));
 	if (len!=0) {
-		httpd_printf("cgiWifiSetMode: %s\n", buff);
 #ifndef DEMO_MODE
-		wifi_set_opmode(atoi(buff));
-		system_restart();
+        if (os_strcmp(buff, "STA") == 0)
+            newMode = STATION_MODE;
+        else if (os_strcmp(buff, "AP") == 0)
+            newMode = SOFTAP_MODE;
+        else if (os_strcmp(buff, "STA+AP") == 0)
+            newMode = STATIONAP_MODE;
+        else
+            newMode = atoi(buff);
+os_printf("cgiWiFiSetMode: '%s' (%d)\n", buff, newMode);
+        os_timer_disarm(&setModeTimer);
+        os_timer_setfn(&setModeTimer, setModeCb, NULL);
+        os_timer_arm(&setModeTimer, 1000, 0);
 #endif
 	}
 	httpdRedirect(connData, "/wifi");

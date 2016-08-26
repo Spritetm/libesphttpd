@@ -15,6 +15,13 @@ typedef struct HttpdPriv HttpdPriv;
 typedef struct HttpdConnData HttpdConnData;
 typedef struct HttpdPostData HttpdPostData;
 
+enum {
+    CGI_CB_RECV,
+    CGI_CB_SENT,
+    CGI_CB_DISCONNECT,
+    CGI_CB_RECONNECT    // connection failed?
+};
+
 typedef int (* cgiSendCallback)(HttpdConnData *connData);
 typedef int (* cgiRecvHandler)(HttpdConnData *connData, char *data, int len);
 
@@ -29,7 +36,9 @@ struct HttpdConnData {
 	void *cgiData;			// Opaque data pointer for the CGI function
 	char *hostName;			// Host name field of request
 	HttpdPriv *priv;		// Opaque pointer to data for internal httpd housekeeping
-	cgiSendCallback cgi;	// CGI function pointer
+	int cgiReason;          // Reason cgi is being called
+    int cgiValue;           // Value associated with the reason (usually an error code)
+    cgiSendCallback cgi;	// CGI function pointer
 	cgiRecvHandler recvHdl;	// Handler for data received after headers, if any
 	HttpdPostData *post;	// POST data structure
 	int remote_port;		// Remote TCP port
@@ -78,6 +87,7 @@ void httpdCgiIsDone(HttpdConnData *conn);
 void httpdSentCb(ConnTypePtr conn, char *remIp, int remPort);
 void httpdRecvCb(ConnTypePtr conn, char *remIp, int remPort, char *data, unsigned short len);
 void httpdDisconCb(ConnTypePtr conn, char *remIp, int remPort);
+void httpdReconCb(ConnTypePtr conn, char *remIp, int remPort, int err);
 int httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort);
 
 

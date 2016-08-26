@@ -15,8 +15,8 @@ static esp_tcp httpdTcp;
 
 
 static void ICACHE_FLASH_ATTR platReconCb(void *arg, sint8 err) {
-os_printf("RECON: %d\n", err);
-	//Yeah, this is pretty useless...
+	ConnTypePtr conn=arg;
+	httpdReconCb(conn, (char*)conn->proto.tcp->remote_ip, conn->proto.tcp->remote_port, err);
 }
 
 static void ICACHE_FLASH_ATTR platDisconCb(void *arg) {

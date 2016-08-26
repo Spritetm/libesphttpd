@@ -454,6 +454,13 @@ void ICACHE_FLASH_ATTR httpdCgiIsDone(HttpdConnData *conn) {
 	}
 }
 
+// store the cgi callback reason and call the user's function
+static int ICACHE_FLASH_ATTR callCGI(HttpdConnData *connData, int reason, int value) {
+    connData->cgiReason = reason;
+    connData->cgiValue = value;
+    return connData->cgi(connData);
+}
+ 
 //Callback called when the data on a socket has been successfully
 //sent.
 void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) {
@@ -488,7 +495,7 @@ void ICACHE_FLASH_ATTR httpdSentCb(ConnTypePtr rconn, char *remIp, int remPort) 
 	conn->priv->sendBuffLen=0;
     conn->priv->sendBuffMax = MAX_SENDBUFF_LEN;
 
-	r=conn->cgi(conn); //Execute cgi fn.
+	r=callCGI(conn, CGI_CB_SENT, 0); //Execute cgi fn.
 	if (r==HTTPD_CGI_DONE) {
 		httpdCgiIsDone(conn);
 	}
@@ -539,7 +546,7 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 		
 		//Okay, we have a CGI function that matches the URL. See if it wants to handle the
 		//particular URL we're supposed to handle.
-		r=conn->cgi(conn);
+		r=callCGI(conn, CGI_CB_RECV, 0);
 		if (r==HTTPD_CGI_MORE) {
 			//Yep, it's happy to do so and has more data to send.
 			if (conn->recvHdl) {
@@ -701,7 +708,7 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 				conn->post->buff[conn->post->buffLen]=0; //zero-terminate, in case the cgi handler knows it can use strings
 				//Process the data
 				if (conn->cgi) {
-					r=conn->cgi(conn);
+					r=callCGI(conn, CGI_CB_RECV, 0);
 					if (r==HTTPD_CGI_DONE) {
 						httpdCgiIsDone(conn);
 					}
@@ -738,10 +745,19 @@ void ICACHE_FLASH_ATTR httpdDisconCb(ConnTypePtr rconn, char *remIp, int remPort
 	if (hconn==NULL) return;
 	httpd_printf("Pool slot %d: socket closed.\n", hconn->slot);
 	hconn->conn=NULL; //indicate cgi the connection is gone
-	if (hconn->cgi) hconn->cgi(hconn); //Execute cgi fn if needed
+	if (hconn->cgi) callCGI(hconn, CGI_CB_DISCONNECT, 0); //Execute cgi fn if needed
 	httpdRetireConn(hconn);
 }
 
+//This seems to be called on connection failure
+void ICACHE_FLASH_ATTR httpdReconCb(ConnTypePtr rconn, char *remIp, int remPort, int err) {
+	HttpdConnData *hconn=rconn->reverse;
+	if (hconn==NULL) return;
+	httpd_printf("Pool slot %d: socket closed.\n", hconn->slot);
+	hconn->conn=NULL; //indicate cgi the connection is gone
+	if (hconn->cgi) callCGI(hconn, CGI_CB_RECONNECT, err); //Execute cgi fn if needed
+	httpdRetireConn(hconn);
+}
 
 int ICACHE_FLASH_ATTR httpdConnectCb(ConnTypePtr conn, char *remIp, int remPort) {
 	int i;
