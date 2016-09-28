@@ -97,7 +97,7 @@ endif
 
 
 ifeq ("$(ESP32)","yes")
-TOOLPREFIX=xtensa-esp108-elf-
+TOOLPREFIX=xtensa-esp32-elf-
 CFLAGS+=-DESP32
 else
 TOOLPREFIX=xtensa-lx106-elf-
