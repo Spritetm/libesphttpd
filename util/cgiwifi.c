@@ -165,18 +165,19 @@ static struct station_config stconf;
 static void ICACHE_FLASH_ATTR resetTimerCb(void *arg) {
 	int x=wifi_station_get_connect_status();
 	if (x==STATION_GOT_IP) {
+		httpd_printf("Got IP address.\n");
 #ifdef SWITCH_TO_STA_MODE_AFTER_CONNECT
 		//Go to STA mode. This needs a reset, so do that.
-		httpd_printf("Got IP. Going into STA mode..\n");
-		wifi_set_opmode(1);
-		system_restart();
-#else
-		httpd_printf("Got IP address\n");
+		if (x!=STATION_MODE) {
+            httpd_printf("Going into STA mode..\n");
+		    wifi_set_opmode(STATION_MODE);
+		    system_restart();
+        }
 #endif
 	} else {
 		connTryStatus=CONNTRY_FAIL;
 #ifdef SWITCH_TO_STA_MODE_AFTER_CONNECT
-		httpd_printf("Connect fail. Not going into STA-only mode.\n");
+		httpd_printf("Connect failed. Not going into STA-only mode.\n");
 		//Maybe also pass this through on the webpage?
 #else
         httpd_printf("Connect failed.\n");
@@ -191,13 +192,12 @@ static void ICACHE_FLASH_ATTR resetTimerCb(void *arg) {
 //but I can't be arsed to put the code back :P
 static void ICACHE_FLASH_ATTR reassTimerCb(void *arg) {
 	int x;
-	httpd_printf("Try to connect to AP....\n");
 	wifi_station_disconnect();
 	wifi_station_set_config(&stconf);
 	wifi_station_connect();
 	x=wifi_get_opmode();
 	connTryStatus=CONNTRY_WORKING;
-	if (x!=1) {
+	if (x!=STATION_MODE) {
 		//Schedule disconnect/connect
 		os_timer_disarm(&resetTimer);
 		os_timer_setfn(&resetTimer, resetTimerCb, NULL);
@@ -248,6 +248,8 @@ int ICACHE_FLASH_ATTR wifiJoin(char *ssid, char *passwd)
 	strncpy((char*)stconf.password, passwd, 64);
 	httpd_printf("Try to connect to AP %s pw %s\n", ssid, passwd);
 
+    connTryStatus=CONNTRY_IDLE;
+    
 	//Schedule disconnect/connect
 	os_timer_disarm(&reassTimer);
 	os_timer_setfn(&reassTimer, reassTimerCb, NULL);
@@ -265,8 +267,9 @@ static void ICACHE_FLASH_ATTR setModeCb(void *arg) {
     case STATION_MODE:
     case SOFTAP_MODE:
     case STATIONAP_MODE:
-        wifi_set_opmode(newMode);
-        system_restart();
+        if (!wifi_set_opmode(newMode))
+            httpd_printf("wifi_set_opmode failed\n");
+        //system_restart();
         break;
     default:
         os_printf("setModeCb: invalid mode %d\n", newMode);
