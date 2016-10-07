@@ -37,6 +37,19 @@ typedef struct {
 //Static scan status storage.
 static ScanResultData cgiWifiAps;
 
+#ifndef DEMO_MODE
+
+typedef struct {
+    os_timer_t timer;
+    char inProgress;
+    char newMode;
+    char needScan;
+} NewModeData;
+
+static NewModeData newModeData;
+
+#endif
+
 #define CONNTRY_IDLE 0
 #define CONNTRY_WORKING 1
 #define CONNTRY_SUCCESS 2
@@ -103,8 +116,21 @@ void ICACHE_FLASH_ATTR wifiScanDoneCb(void *arg, STATUS status) {
 static void ICACHE_FLASH_ATTR wifiStartScan() {
 //	int x;
 	if (cgiWifiAps.scanInProgress) return;
-	cgiWifiAps.scanInProgress=1;
-	wifi_station_scan(NULL, wifiScanDoneCb);
+    if (newModeData.inProgress) {
+        if (newModeData.newMode == STATIONAP_MODE)
+            newModeData.needScan = 1;
+        else
+            httpd_printf("Must be in STA+AP mode to start AP scan: mode=%d\n", newModeData.newMode);
+    }
+    else {
+        if (wifi_get_opmode() == STATIONAP_MODE) {
+            httpd_printf("Starting scan...\n");
+	        wifi_station_scan(NULL, wifiScanDoneCb);
+ 	        cgiWifiAps.scanInProgress=1;
+        }
+        else
+            httpd_printf("Must be in STA+AP mode to start AP scan: mode=%d\n", wifi_get_opmode());
+    }
 }
 
 //This CGI is called from the bit of AJAX-code in wifi.html. It will initiate a
@@ -171,7 +197,6 @@ static void ICACHE_FLASH_ATTR resetTimerCb(void *arg) {
 		if (x!=STATION_MODE) {
             httpd_printf("Going into STA mode..\n");
 		    wifi_set_opmode(STATION_MODE);
-		    system_restart();
         }
 #endif
 	} else {
@@ -259,22 +284,26 @@ int ICACHE_FLASH_ATTR wifiJoin(char *ssid, char *passwd)
 }
 
 #ifndef DEMO_MODE
-static os_timer_t setModeTimer;
-static int newMode;
 
 static void ICACHE_FLASH_ATTR setModeCb(void *arg) {
-    switch (newMode) {
+    if (!newModeData.inProgress) return;
+    switch (newModeData.newMode) {
     case STATION_MODE:
     case SOFTAP_MODE:
     case STATIONAP_MODE:
-        if (!wifi_set_opmode(newMode))
-            httpd_printf("wifi_set_opmode failed\n");
-        //system_restart();
+httpd_printf("setModeCb: %d\n", newModeData.newMode);
+        wifi_set_opmode(newModeData.newMode);
         break;
     default:
-        os_printf("setModeCb: invalid mode %d\n", newMode);
+        httpd_printf("setModeCb: invalid mode %d\n", newModeData.newMode);
         break;
     }
+    if (newModeData.needScan) {
+        httpd_printf("Starting deferred scan...\n");
+        wifi_station_scan(NULL, wifiScanDoneCb);
+        cgiWifiAps.scanInProgress=1;
+    }
+    newModeData.inProgress = 0;
 }
 #endif
 
@@ -293,17 +322,19 @@ int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
 	if (len!=0) {
 #ifndef DEMO_MODE
         if (os_strcmp(buff, "STA") == 0)
-            newMode = STATION_MODE;
+            newModeData.newMode = STATION_MODE;
         else if (os_strcmp(buff, "AP") == 0)
-            newMode = SOFTAP_MODE;
+            newModeData.newMode = SOFTAP_MODE;
         else if (os_strcmp(buff, "STA+AP") == 0)
-            newMode = STATIONAP_MODE;
+            newModeData.newMode = STATIONAP_MODE;
         else
-            newMode = atoi(buff);
-os_printf("cgiWiFiSetMode: '%s' (%d)\n", buff, newMode);
-        os_timer_disarm(&setModeTimer);
-        os_timer_setfn(&setModeTimer, setModeCb, NULL);
-        os_timer_arm(&setModeTimer, 1000, 0);
+            newModeData.newMode = atoi(buff);
+httpd_printf("cgiWiFiSetMode: '%s' (%d)\n", buff, newModeData.newMode);
+        newModeData.inProgress = 1;
+        newModeData.needScan = 0;
+        os_timer_disarm(&newModeData.timer);
+        os_timer_setfn(&newModeData.timer, setModeCb, NULL);
+        os_timer_arm(&newModeData.timer, 1000, 0);
 #endif
 	}
 	httpdRedirect(connData, "/wifi");
