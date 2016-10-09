@@ -12,6 +12,7 @@ YUI-COMPRESSOR ?= /usr/bin/yui-compressor
 USE_HEATSHRINK ?= yes
 HTTPD_WEBSOCKETS ?= yes
 USE_OPENSDK ?= no
+USE_SSL ?= no
 HTTPD_MAX_CONNECTIONS ?= 4
 #For FreeRTOS
 HTTPD_STACKSIZE ?= 2048
@@ -150,6 +151,10 @@ endif
 
 ifeq ("$(HTTPD_WEBSOCKETS)","yes")
 CFLAGS		+= -DHTTPD_WEBSOCKETS
+endif
+
+ifeq ("$(USE_SSL)","yes")
+CFLAGS		+= -DUSE_SSL
 endif
 
 vpath %.c $(SRC_DIR)

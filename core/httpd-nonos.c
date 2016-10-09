@@ -53,15 +53,23 @@ static void ICACHE_FLASH_ATTR platConnCb(void *arg) {
 		espconn_regist_disconcb(conn, platDisconCb);
 		espconn_regist_sentcb(conn, platSentCb);
 	} else {
+#ifdef USE_SSL
+        espconn_secure_disconnect(conn);
+#else        
 		espconn_disconnect(conn);
+#endif
 	}
 }
 
 
 int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
 	int r;
-	r=espconn_sent(conn, (uint8_t*)buff, len);
-	return (r>=0);
+#ifdef USE_SSL
+    r=espconn_secure_send(conn, (uint8_t*)buff, len);
+#else
+    r=espconn_sent(conn, (uint8_t*)buff, len);
+#endif
+    return (r>=0);
 }
 
 void ICACHE_FLASH_ATTR httpdPlatDisconnect(ConnTypePtr conn) {
@@ -80,8 +88,15 @@ void ICACHE_FLASH_ATTR httpdPlatInit(int port, int maxConnCt) {
 	httpdTcp.local_port=port;
 	httpdConn.proto.tcp=&httpdTcp;
 	espconn_regist_connectcb(&httpdConn, platConnCb);
-	espconn_accept(&httpdConn);
-	espconn_tcp_set_max_con_allow(&httpdConn, maxConnCt);
+#ifdef USE_SSL
+    //espconn_secure_set_default_certificate(default_certificate, default_certificate_len);
+    //espconn_secure_set_default_private_key(default_private_key, default_private_key_len);
+    espconn_secure_accept(&httpdConn);
+#else
+    espconn_accept(&httpdConn);
+#endif
+    espconn_tcp_set_max_con_allow(&httpdConn, maxConnCt);
+    
 }
 
 
