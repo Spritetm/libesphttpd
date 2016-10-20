@@ -38,6 +38,8 @@ It's written for use with httpd, but doesn't need to be used as such.
 #include "heatshrink_decoder.h"
 #endif
 
+
+//ESP8266 stores flash offsets here. ESP32, for now, stores memory locations here.
 static char* espFsData = NULL;
 
 
@@ -68,38 +70,10 @@ a memory exception, crashing the program.
 
 #ifndef ESP32
 #define FLASH_BASE_ADDR 0x40200000
-#else
-//ESP32 IRAM addresses start at 0x40000000, but the IRAM segment actually is mapped
-//starting from SPI address 0x40000.
-#define FLASH_BASE_ADDR 0x40040000
 #endif
 
-EspFsInitResult ICACHE_FLASH_ATTR espFsInit(void *flashAddress) {
-	if((uint32_t)flashAddress > 0x40000000) {
-		flashAddress = (void*)((uint32_t)flashAddress-FLASH_BASE_ADDR);
-	}
-
-	// base address must be aligned to 4 bytes
-	if (((int)flashAddress & 3) != 0) {
-		return ESPFS_INIT_RESULT_BAD_ALIGN;
-	}
-
-	// check if there is valid header at address
-	EspFsHeader testHeader;
-	spi_flash_read((uint32)flashAddress, (uint32*)&testHeader, sizeof(EspFsHeader));
-	if (testHeader.magic != ESPFS_MAGIC) {
-		return ESPFS_INIT_RESULT_NO_IMAGE;
-	}
-
-	espFsData = (char *)flashAddress;
-	return ESPFS_INIT_RESULT_OK;
-}
-
-//Copies len bytes over from dst to src, but does it using *only*
-//aligned 32-bit reads. Yes, it's no too optimized but it's short and sweet and it works.
-
 //ToDo: perhaps memcpy also does unaligned accesses?
-#ifdef __ets__
+#if defined(__ets__) && !defined(ESP32)
 void ICACHE_FLASH_ATTR readFlashUnaligned(char *dst, char *src, int len) {
 	uint8_t src_offset = ((uint32_t)src) & 3;
 	uint32_t src_address = ((uint32_t)src) - src_offset;
@@ -111,6 +85,41 @@ void ICACHE_FLASH_ATTR readFlashUnaligned(char *dst, char *src, int len) {
 #else
 #define readFlashUnaligned memcpy
 #endif
+
+#if defined(__ets__) && !defined(ESP32)
+void ICACHE_FLASH_ATTR readFlashAligned(uint32 *dst, uint32_t pos, int len) {
+	spi_flash_read(pos, dst, len);
+}
+#else
+#define readFlashAligned(a,b,c) memcpy(a, (uint32_t*)b, c)
+#endif
+
+EspFsInitResult ICACHE_FLASH_ATTR espFsInit(void *flashAddress) {
+#ifndef ESP32
+	if((uint32_t)flashAddress > 0x40000000) {
+		flashAddress = (void*)((uint32_t)flashAddress-FLASH_BASE_ADDR);
+	}
+
+	// base address must be aligned to 4 bytes
+	if (((int)flashAddress & 3) != 0) {
+		return ESPFS_INIT_RESULT_BAD_ALIGN;
+	}
+#endif
+
+	// check if there is valid header at address
+	EspFsHeader testHeader;
+	readFlashUnaligned((char*)&testHeader, (char*)flashAddress, sizeof(EspFsHeader));
+	printf("Esp magic: %x (should be %x)\n", testHeader.magic, ESPFS_MAGIC);
+	if (testHeader.magic != ESPFS_MAGIC) {
+		return ESPFS_INIT_RESULT_NO_IMAGE;
+	}
+
+	espFsData = (char *)flashAddress;
+	return ESPFS_INIT_RESULT_OK;
+}
+
+//Copies len bytes over from dst to src, but does it using *only*
+//aligned 32-bit reads. Yes, it's no too optimized but it's short and sweet and it works.
 
 // Returns flags of opened file.
 int ICACHE_FLASH_ATTR espFsFlags(EspFsFile *fh) {
@@ -141,7 +150,7 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 	while(1) {
 		hpos=p;
 		//Grab the next file header.
-		spi_flash_read((uint32)p, (uint32*)&h, sizeof(EspFsHeader));
+		readFlashAligned((uint32*)&h, (uint32)p, sizeof(EspFsHeader));
 
 		if (h.magic!=ESPFS_MAGIC) {
 			httpd_printf("Magic mismatch. EspFS image broken.\n");
@@ -153,7 +162,7 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 		}
 		//Grab the name of the file.
 		p+=sizeof(EspFsHeader); 
-		spi_flash_read((uint32)p, (uint32*)&namebuf, sizeof(namebuf));
+		readFlashAligned((uint32*)&namebuf, (uint32)p, sizeof(namebuf));
 //		httpd_printf("Found file '%s'. Namelen=%x fileLenComp=%x, compr=%d flags=%d\n", 
 //				namebuf, (unsigned int)h.nameLen, (unsigned int)h.fileLenComp, h.compression, h.flags);
 		if (strcmp(namebuf, fileName)==0) {
