@@ -1,0 +1,29 @@
+#ESP-IDF Kconfig configuration file. Not used for ESP8266 RTOS/non-RTOS SDKs.
+
+menu "ESP-HTTPD Config"
+
+config ESPHTTPD_MAX_CONNECTIONS
+	int "Maximum amount of connections"
+	range 1 LWIP_MAX_SOCKETS
+	default 4
+	help
+		Amount of concurrent connections esp-httpd can sustain. Cannot be more than the amount of sockets lwip supports.
+
+config ESPHTTPD_STACK_SIZE
+	int "Stack size of ESP-HTTPD task"
+	range 1024 16384
+	default 4096
+	help
+		Stack size reserved for the esp-httpd main task plus CGIs.
+
+config ESPHTTPD_HTMLDIR
+	string "Directory (on the build machine) where the static files served by the webserver are"
+	default "html/"
+
+config ESPHTTPD_USEYUICOMPRESSOR
+	bool "Compress JS/CSS with YUI compressor"
+	default n
+	help
+		Compress JS and CSS files with the YIU compressor. Needs YUI installed.
+
+endmenu

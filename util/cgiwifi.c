@@ -17,6 +17,7 @@ Cgi/template routines for the /wifi url.
 
 //Enable this to disallow any changes in AP settings
 //#define DEMO_MODE
+#ifndef ESP32
 
 //WiFi access point data
 typedef struct {
@@ -116,10 +117,13 @@ static void ICACHE_FLASH_ATTR wifiStartScan() {
 	wifi_station_scan(NULL, wifiScanDoneCb);
 }
 
+#endif
+
 //This CGI is called from the bit of AJAX-code in wifi.tpl. It will initiate a
 //scan for access points and if available will return the result of an earlier scan.
 //The result is embedded in a bit of JSON parsed by the javascript in wifi.tpl.
 int ICACHE_FLASH_ATTR cgiWiFiScan(HttpdConnData *connData) {
+#ifndef ESP32
 	int pos=(int)connData->cgiData;
 	int len;
 	char buff[1024];
@@ -162,8 +166,12 @@ int ICACHE_FLASH_ATTR cgiWiFiScan(HttpdConnData *connData) {
 		connData->cgiData=(void *)1;
 		return HTTPD_CGI_MORE;
 	}
+#else
+	return HTTPD_CGI_DONE;
+#endif
 }
 
+#ifndef ESP32
 //Temp store for new ap info.
 static struct station_config stconf;
 
@@ -203,11 +211,12 @@ static void ICACHE_FLASH_ATTR reassTimerCb(void *arg) {
 		os_timer_arm(&resetTimer, 15000, 0); //time out after 15 secs of trying to connect
 	}
 }
-
+#endif
 
 //This cgi uses the routines above to connect to a specific access point with the
 //given ESSID using the given password.
 int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
+#ifndef ESP32
 	char essid[128];
 	char passwd[128];
 	static os_timer_t reassTimer;
@@ -234,12 +243,14 @@ int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 	os_timer_arm(&reassTimer, 500, 0);
 	httpdRedirect(connData, "connecting.html");
 #endif
+#endif
 	return HTTPD_CGI_DONE;
 }
 
 //This cgi uses the routines above to connect to a specific access point with the
 //given ESSID using the given password.
 int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
+#ifndef ESP32
 	int len;
 	char buff[1024];
 	
@@ -257,10 +268,12 @@ int ICACHE_FLASH_ATTR cgiWiFiSetMode(HttpdConnData *connData) {
 #endif
 	}
 	httpdRedirect(connData, "/wifi");
+#endif
 	return HTTPD_CGI_DONE;
 }
 
 int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
+#ifndef ESP32
 	char buff[1024];
 	int len;
 	struct ip_info info;
@@ -288,11 +301,13 @@ int ICACHE_FLASH_ATTR cgiWiFiConnStatus(HttpdConnData *connData) {
 	}
 
 	httpdSend(connData, buff, len);
+#endif
 	return HTTPD_CGI_DONE;
 }
 
 //Template code for the WLAN page.
 int ICACHE_FLASH_ATTR tplWlan(HttpdConnData *connData, char *token, void **arg) {
+#ifndef ESP32
 	char buff[1024];
 	int x;
 	static struct station_config stconf;
@@ -318,6 +333,7 @@ int ICACHE_FLASH_ATTR tplWlan(HttpdConnData *connData, char *token, void **arg) 
 		}
 	}
 	httpdSend(connData, buff, -1);
+#endif
 	return HTTPD_CGI_DONE;
 }
 

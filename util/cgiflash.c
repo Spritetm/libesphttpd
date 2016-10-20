@@ -12,9 +12,9 @@ Some flash handling cgi routines. Used for updating the ESPFS/OTA image.
  */
 
 //This doesn't work yet on the ESP32. ToDo: figure out how to make it work.
+#include <esp8266.h>
 #ifndef ESP32
 
-#include <esp8266.h>
 #include "cgiflash.h"
 #include "espfs.h"
 #include "cgiflash.h"

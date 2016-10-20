@@ -2,19 +2,34 @@
 #define PLATFORM_H
 
 #ifdef FREERTOS
+#include <esp8266.h>
+
+#ifdef ESP32
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
+#else
+#include "FreeRTOS.h"
+#include "timers.h"
+#endif
+
 //#include "esp_timer.h"
 typedef struct RtosConnType RtosConnType;
 typedef RtosConnType* ConnTypePtr;
-#if 0
-//Unfortunately, this does not always work... the latest esp32 sdk, for example, breaks this.
+typedef TimerHandle_t HttpdPlatTimerHandle;
+
+#ifndef ESP32 //esp32 does not need this because it can map flash into D-port memory
 #define httpd_printf(fmt, ...) do {	\
 	static const char flash_str[] ICACHE_RODATA_ATTR STORE_ATTR = fmt;	\
 	printf(flash_str, ##__VA_ARGS__);	\
 	} while(0)
 #else
-#define httpd_printf(fmt, ...) os_printf(fmt, ##__VA_ARGS__)
+#define httpd_printf(fmt, ...) printf(fmt, ##__VA_ARGS__)
+#endif
+#ifdef ESP32
+#define ICACHE_FLASH_ATTR
 #endif
 #else
+
 #define printf(...) os_printf(__VA_ARGS__)
 #define sprintf(str, ...) os_sprintf(str, __VA_ARGS__)
 #define strcpy(a, b) os_strcpy(a, b)
@@ -30,6 +45,8 @@ typedef RtosConnType* ConnTypePtr;
 #define strlen(a) os_strlen(a)
 #define memcmp(a, b, c) os_memcmp(a, b, c)
 typedef struct espconn* ConnTypePtr;
+typedef struct HttpdPlatTimer HttpdPlatTimer;
+typedef *HttpdPlatTimer HttpdPlatTimerHandle;
 #define httpd_printf(format, ...) os_printf(format, ##__VA_ARGS__)
 #endif
 

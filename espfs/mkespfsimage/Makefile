@@ -1,7 +1,9 @@
 GZIP_COMPRESSION ?= no
 USE_HEATSHRINK ?= yes
 
-CFLAGS=-I../../lib/heatshrink -I../../include -I.. -std=gnu99
+THISDIR:=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
+CFLAGS=-I$(THISDIR)../../lib/heatshrink -I$(THISDIR)../../include -I$(THISDIR)/.. -std=gnu99
 ifeq ("$(GZIP_COMPRESSION)","yes")
 CFLAGS		+= -DESPFS_GZIP
 endif
@@ -12,6 +14,11 @@ endif
 
 OBJS=main.o heatshrink_encoder.o
 TARGET=mkespfsimage
+
+
+%.o: $(THISDIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $^
+
 
 $(TARGET): $(OBJS)
 ifeq ("$(GZIP_COMPRESSION)","yes")

@@ -16,11 +16,20 @@ the internal webserver.
 */
 
 #include <esp8266.h>
+#ifndef ESP32
+
 #ifdef FREERTOS
 
+#ifdef ESP32
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#else
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#endif
+
 
 #include "lwip/sockets.h"
 #include "lwip/err.h"
@@ -330,5 +339,7 @@ void ICACHE_FLASH_ATTR captdnsInit(void) {
 	espconn_regist_recvcb(&conn, captdnsRecv);
 	espconn_create(&conn);
 }
+
+#endif
 
 #endif

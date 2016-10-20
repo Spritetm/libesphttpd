@@ -18,7 +18,7 @@ It's written for use with httpd, but doesn't need to be used as such.
 //simplifies debugging, but needs some slightly different headers. The #ifdef takes
 //care of that.
 
-#ifdef __ets__
+#if __ets__ || ESP_PLATFORM
 //esp build
 #include <esp8266.h>
 #else

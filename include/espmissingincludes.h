@@ -2,8 +2,9 @@
 #define ESPMISSINGINCLUDES_H
 
 #include <stdint.h>
+#ifndef ESP32
 #include <c_types.h>
-
+#endif
 
 int strcasecmp(const char *a, const char *b);
 #ifndef FREERTOS

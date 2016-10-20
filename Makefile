@@ -1,3 +1,4 @@
+#Makefile, only used on esp8266 RTOS and non-RTOS SDK. Esp32 uses component.mk instead.
 
 # Directory the Makefile is in. Please don't include other Makefiles before this.
 THISDIR:=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
