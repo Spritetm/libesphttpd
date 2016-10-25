@@ -5,6 +5,7 @@
 
 #define CGIFLASH_TYPE_FW 0
 #define CGIFLASH_TYPE_ESPFS 1
+#define CGIFLASH_TYPE_FW_SINGLE 2 // This is where user1 & user2 are identical
 
 typedef struct {
 	int type;
