@@ -171,22 +171,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 						state->address=def->fw2Pos;
 					}
 				}
-            } else if (def->type==CGIFLASH_TYPE_FW_SINGLE && checkBinHeader(connData->post->buff)) {
-                if (connData->post->len > def->fwSize) {
-                    state->err="Firmware image too large";
-                    state->state=FLST_ERROR;
-                } else {
-                    state->len=connData->post->len;
-                    if (system_upgrade_userbin_check() == 1) {
-                        httpd_printf("Flashing image into user1\n");
-                        state->address=def->fw1Pos;
-                    } else {
-                        httpd_printf("Flashing image into user2\n");
-                        state->address=def->fw2Pos;
-                    }
-                    state->state=FLST_WRITE;
-                }
-            } else if (def->type==CGIFLASH_TYPE_FW && checkBinHeader(connData->post->buff)) {
+			} else if (def->type==CGIFLASH_TYPE_FW && checkBinHeader(connData->post->buff)) {
 				if (connData->post->len > def->fwSize) {
 					state->err="Firmware image too large";
 					state->state=FLST_ERROR;
