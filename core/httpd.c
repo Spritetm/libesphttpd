@@ -536,6 +536,7 @@ static void ICACHE_FLASH_ATTR httpdProcessRequest(HttpdConnData *conn) {
 			if (match) {
 				httpd_printf("Is url index %d\n", i);
 				conn->cgiData=NULL;
+				conn->userData=NULL;
 				conn->cgi=builtInUrls[i].cgiCb;
 				conn->cgiArg=builtInUrls[i].cgiArg;
 				break;

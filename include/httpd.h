@@ -50,6 +50,7 @@ struct HttpdConnData {
 	int remote_port;		// Remote TCP port
 	uint8 remote_ip[4];		// IP address of client
 	uint8 slot;				// Slot ID
+	void *userData;			// Variable for storing any user data
 };
 
 //A struct describing the POST data sent inside the http connection.  This is used by the CGI functions
