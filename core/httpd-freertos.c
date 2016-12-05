@@ -133,6 +133,7 @@ static void platHttpServerTask(void *pvParameters) {
 				FD_SET(rconn[x].fd, &readset);
 				if (rconn[x].needWriteDoneNotif) FD_SET(rconn[x].fd, &writeset);
 				if (rconn[x].fd>maxfdp) maxfdp=rconn[x].fd;
+				printf("Sel add %d (write %d)\n", (int)rconn[x].fd, rconn[x].needWriteDoneNotif);
 			} else {
 				socketsFull=0;
 			}
@@ -141,10 +142,12 @@ static void platHttpServerTask(void *pvParameters) {
 		if (!socketsFull) {
 			FD_SET(listenfd, &readset);
 			if (listenfd>maxfdp) maxfdp=listenfd;
+			printf("Sel add listen %d\n", listenfd);
 		}
 
 		//polling all exist client handle,wait until readable/writable
-		ret = select(maxfdp+1, &readset, &writeset, NULL, NULL);//&timeout
+		ret = lwip_select(maxfdp+1, &readset, &writeset, NULL, NULL);//&timeout
+		printf("sel ret\n");
 		if(ret > 0){
 			//See if we need to accept a new connection
 			if (FD_ISSET(listenfd, &readset)) {
