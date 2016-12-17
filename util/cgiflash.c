@@ -196,7 +196,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 				state->state=FLST_ERROR;
 				httpd_printf("Combined flash image not supported on ESP32!\n");
 #endif
-			} else if (def->type==CGIFLASH_TYPE_FW) {// && checkBinHeader(connData->post->buff)) {
+			} else if (def->type==CGIFLASH_TYPE_FW && checkBinHeader(connData->post->buff)) {
 #if !ESP32
 				if (connData->post->len > def->fwSize) {
 					state->err="Firmware image too large";
@@ -300,7 +300,11 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 			httpdSend(connData, state->err, -1);
 			httpdSend(connData, "\n", -1);
 		} else {
+<<<<<<< HEAD
 			//esp32flashSetOtaAsCurrentImage();
+=======
+			esp32flashSetOtaAsCurrentImage();
+>>>>>>> c08b304e8b907287af7580510db4c6323eeb052c
 		}
 		free(state);
 		return HTTPD_CGI_DONE;
