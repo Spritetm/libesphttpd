@@ -18,15 +18,6 @@ Cgi/template routines for the /wifi url.
 //Enable this to disallow any changes in AP settings
 //#define DEMO_MODE
 
-//WiFi access point data
-typedef struct {
-	char ssid[32];
-	char bssid[8];
-	int channel;
-	char rssi;
-	char enc;
-} ApData;
-
 //Scan result
 typedef struct {
 	char scanInProgress; //if 1, don't access the underlying stuff from the webpage.
@@ -36,6 +27,10 @@ typedef struct {
 
 //Static scan status storage.
 static ScanResultData cgiWifiAps;
+
+//Callback for outside scan clients
+static void (*scanCallback)(void *data, int count) = NULL;
+static void *scanCallbackData;
 
 #ifndef DEMO_MODE
 
@@ -61,8 +56,9 @@ static os_timer_t resetTimer;
 //Callback the code calls when a wlan ap scan is done. Basically stores the result in
 //the cgiWifiAps struct.
 void ICACHE_FLASH_ATTR wifiScanDoneCb(void *arg, STATUS status) {
-	int n;
+	int noAps, n, i;
 	struct bss_info *bss_link = (struct bss_info *)arg;
+
 	httpd_printf("wifiScanDoneCb %d\n", status);
 	if (status!=OK) {
 		cgiWifiAps.scanInProgress=0;
@@ -76,41 +72,63 @@ void ICACHE_FLASH_ATTR wifiScanDoneCb(void *arg, STATUS status) {
 	}
 
 	//Count amount of access points found.
-	n=0;
+	noAps=0;
 	while (bss_link != NULL) {
 		bss_link = bss_link->next.stqe_next;
-		n++;
+		noAps++;
 	}
+
 	//Allocate memory for access point data
-	cgiWifiAps.apData=(ApData **)malloc(sizeof(ApData *)*n);
-	cgiWifiAps.noAps=n;
-	httpd_printf("Scan done: found %d APs\n", n);
+	cgiWifiAps.apData=(ApData **)malloc(sizeof(ApData *)*noAps);
+    memset(cgiWifiAps.apData, 0, sizeof(ApData *)*noAps);
 
 	//Copy access point data to the static struct
 	n=0;
 	bss_link = (struct bss_info *)arg;
 	while (bss_link != NULL) {
-		if (n>=cgiWifiAps.noAps) {
+		if (n>=noAps) {
 			//This means the bss_link changed under our nose. Shouldn't happen!
 			//Break because otherwise we will write in unallocated memory.
-			httpd_printf("Huh? I have more than the allocated %d aps!\n", cgiWifiAps.noAps);
+			httpd_printf("Huh? I have more than the allocated %d aps!\n", noAps);
 			break;
 		}
+
+        // check for duplicate SSIDs and keep the one with the strongest signal
+        for (i = 0; i < n; ++i) {
+            if (strncmp((char*)bss_link->ssid, cgiWifiAps.apData[i]->ssid, 32) == 0) {
+                if (bss_link->rssi > cgiWifiAps.apData[i]->rssi) {
+		            cgiWifiAps.apData[i]->rssi=bss_link->rssi;
+		            cgiWifiAps.apData[i]->channel=bss_link->channel;
+		            cgiWifiAps.apData[i]->enc=bss_link->authmode;
+		            strncpy(cgiWifiAps.apData[i]->bssid, (char*)bss_link->bssid, 6);
+                }
+                break;
+            }
+        }
+
 		//Save the ap data.
-		cgiWifiAps.apData[n]=(ApData *)malloc(sizeof(ApData));
-		cgiWifiAps.apData[n]->rssi=bss_link->rssi;
-		cgiWifiAps.apData[n]->channel=bss_link->channel;
-		cgiWifiAps.apData[n]->enc=bss_link->authmode;
-		strncpy(cgiWifiAps.apData[n]->ssid, (char*)bss_link->ssid, 32);
-		strncpy(cgiWifiAps.apData[n]->bssid, (char*)bss_link->bssid, 6);
+        if (i >= n) {
+		    cgiWifiAps.apData[n]=(ApData *)malloc(sizeof(ApData));
+		    cgiWifiAps.apData[n]->rssi=bss_link->rssi;
+		    cgiWifiAps.apData[n]->channel=bss_link->channel;
+		    cgiWifiAps.apData[n]->enc=bss_link->authmode;
+		    strncpy(cgiWifiAps.apData[n]->ssid, (char*)bss_link->ssid, 32);
+		    strncpy(cgiWifiAps.apData[n]->bssid, (char*)bss_link->bssid, 6);
+		    n++;
+        }
 
 		bss_link = bss_link->next.stqe_next;
-		n++;
 	}
+    cgiWifiAps.noAps = n;
+
 	//We're done.
+	httpd_printf("Scan done: found %d APs\n", cgiWifiAps.noAps);
+    if (scanCallback) {
+        (*scanCallback)(scanCallbackData, cgiWifiAps.noAps);
+        scanCallback = NULL;
+    }
 	cgiWifiAps.scanInProgress=0;
 }
-
 
 //Routine to start a WiFi access point scan.
 static void ICACHE_FLASH_ATTR wifiStartScan() {
@@ -131,6 +149,29 @@ static void ICACHE_FLASH_ATTR wifiStartScan() {
         else
             httpd_printf("Must be in STA+AP mode to start AP scan: mode=%d\n", wifi_get_opmode());
     }
+}
+
+//Routine to start a WiFi access point scan.
+int ICACHE_FLASH_ATTR cgiWiFiStartScan(void (*callback)(void *data, int count), void *data) {
+    if (scanCallback) return 0;
+    scanCallback = callback;
+    scanCallbackData = data;
+    wifiStartScan();
+    return 1;
+}
+
+//Routine to check the status of a WiFi access point scan.
+int ICACHE_FLASH_ATTR cgiWiFiScanDone(void) {
+    return cgiWifiAps.scanInProgress == 0;
+}
+
+//Routine to return a scan result.
+ApData ICACHE_FLASH_ATTR *cgiWiFiScanResult(int n) {
+    if (cgiWifiAps.scanInProgress)
+        return NULL;
+    else if (n < 0 || n >= cgiWifiAps.noAps)
+        return NULL;
+    return cgiWifiAps.apData[n];
 }
 
 //This CGI is called from the bit of AJAX-code in wifi.html. It will initiate a
