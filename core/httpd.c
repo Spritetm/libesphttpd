@@ -692,15 +692,16 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 	int x, r;
 	char *p, *e;
 	httpdPlatLock();
-	char *sendBuff=malloc(HTTPD_MAX_SENDBUFF_LEN);
-	if (sendBuff==NULL) {
-		printf("Malloc sendBuff failed!\n");
+
+	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
+	if (conn==NULL) {
 		httpdPlatUnlock();
 		return;
 	}
 
-	HttpdConnData *conn=httpdFindConnData(rconn, remIp, remPort);
-	if (conn==NULL) {
+	char *sendBuff=malloc(HTTPD_MAX_SENDBUFF_LEN);
+	if (sendBuff==NULL) {
+		printf("Malloc sendBuff failed!\n");
 		httpdPlatUnlock();
 		return;
 	}
