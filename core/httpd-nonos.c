@@ -73,7 +73,11 @@ int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
 }
 
 void ICACHE_FLASH_ATTR httpdPlatDisconnect(ConnTypePtr conn) {
-	espconn_disconnect(conn);
+#ifdef USE_SSL
+    espconn_secure_disconnect(conn);
+#else        
+    espconn_disconnect(conn);
+#endif
 }
 
 void ICACHE_FLASH_ATTR httpdPlatDisableTimeout(ConnTypePtr conn) {
