@@ -148,7 +148,7 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 			return NULL;
 		}
 		if (h.flags&FLAG_LASTFILE) {
-			httpd_printf("End of image.\n");
+//			httpd_printf("End of image.\n");
 			return NULL;
 		}
 		//Grab the name of the file.
