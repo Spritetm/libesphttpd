@@ -715,7 +715,7 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 				}
 			}
 			//ToDo: return http error code 431 (request header too long) if this happens
-			if (conn->priv->headPos!=HTTPD_MAX_HEAD_LEN) conn->priv->head[conn->priv->headPos++]=data[x];
+			if (conn->priv->headPos<HTTPD_MAX_HEAD_LEN-1) conn->priv->head[conn->priv->headPos++]=data[x];
 			conn->priv->head[conn->priv->headPos]=0;
 			//Scan for /r/n/r/n. Receiving this indicate the headers end.
 			if (data[x]=='\n' && (char *)strstr(conn->priv->head, "\r\n\r\n")!=NULL) {
