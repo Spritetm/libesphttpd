@@ -14,15 +14,11 @@ Some flash handling cgi routines. Used for updating the ESPFS/OTA image.
 //This doesn't work yet on the ESP32. ToDo: figure out how to make it work.
 #ifndef ESP32
 
-#include <esp8266.h>
-#include "cgiflash.h"
-#include "espfs.h"
-#include "cgiflash.h"
-#include "espfs.h"
-
-//#include <osapi.h>
-#include "cgiflash.h"
-#include "espfs.h"
+#include <libesphttpd/esp8266.h>
+#include <libesphttpd/cgiflash.h>
+#include <libesphttpd/espfs.h>
+#include <libesphttpd/cgiflash.h>
+#include <libesphttpd/espfs.h>
 
 #ifndef UPGRADE_FLAG_FINISH
 #define UPGRADE_FLAG_FINISH     0x02

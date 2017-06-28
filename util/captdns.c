@@ -15,7 +15,7 @@ be used to send mobile phones, tablets etc which connect to the ESP in AP mode d
 the internal webserver.
 */
 
-#include <esp8266.h>
+#include <libesphttpd/esp8266.h>
 #ifdef FREERTOS
 
 #include "FreeRTOS.h"

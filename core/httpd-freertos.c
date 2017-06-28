@@ -4,25 +4,26 @@ ESP8266 web server - platform-dependent routines, FreeRTOS version
 
 Thanks to my collague at Espressif for writing the foundations of this code.
 */
+#include <libesphttpd/esp8266.h>
+
 #ifdef FREERTOS
 
-
-#include <esp8266.h>
-#include "httpd.h"
-#include "platform.h"
+#include <libesphttpd/httpd.h>
 #include "httpd-platform.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
+#include <string.h>
 
-#include "lwip/lwip/sockets.h"
+#include <FreeRTOS.h>
+#include <task.h>
+#include <queue.h>
+#include <semphr.h>
+
+#include "lwip/sockets.h"
 
 
 static int httpPort;
 static int httpMaxConnCt;
-static xQueueHandle httpdMux;
+static QueueHandle_t httpdMux;
 
 
 struct  RtosConnType{
@@ -61,10 +62,10 @@ void ICACHE_FLASH_ATTR httpdPlatUnlock() {
 
 #define RECV_BUF_SIZE 2048
 static void platHttpServerTask(void *pvParameters) {
-	int32 listenfd;
-	int32 remotefd;
-	int32 len;
-	int32 ret;
+	int32_t listenfd;
+	int32_t remotefd;
+	int32_t len;
+	int32_t ret;
 	int x;
 	int maxfdp = 0;
 	char *precvbuf;
@@ -92,7 +93,7 @@ static void platHttpServerTask(void *pvParameters) {
 		listenfd = socket(AF_INET, SOCK_STREAM, 0);
 		if (listenfd == -1) {
 			httpd_printf("platHttpServerTask: failed to create sock!\n");
-			vTaskDelay(1000/portTICK_RATE_MS);
+			vTaskDelay(1000/portTICK_PERIOD_MS);
 		}
 	} while(listenfd == -1);
 
@@ -101,7 +102,7 @@ static void platHttpServerTask(void *pvParameters) {
 		ret = bind(listenfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if (ret != 0) {
 			httpd_printf("platHttpServerTask: failed to bind!\n");
-			vTaskDelay(1000/portTICK_RATE_MS);
+			vTaskDelay(1000/portTICK_PERIOD_MS);
 		}
 	} while(ret != 0);
 
@@ -110,7 +111,7 @@ static void platHttpServerTask(void *pvParameters) {
 		ret = listen(listenfd, HTTPD_MAX_CONNECTIONS);
 		if (ret != 0) {
 			httpd_printf("platHttpServerTask: failed to listen!\n");
-			vTaskDelay(1000/portTICK_RATE_MS);
+			vTaskDelay(1000/portTICK_PERIOD_MS);
 		}
 		
 	} while(ret != 0);

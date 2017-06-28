@@ -9,8 +9,8 @@
 #ifdef __MINGW32__
 #include <io.h>
 #endif
-#include "espfs.h"
-#include "espfsformat.h"
+#include <libesphttpd/espfs.h>
+#include <espfsformat.h>
 
 //Heatshrink
 #ifdef ESPFS_HEATSHRINK

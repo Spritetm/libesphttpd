@@ -3,6 +3,8 @@
 
 #define HTTPDVER "0.4"
 
+#include <libesphttpd/platform.h>
+
 //Max length of request head. This is statically allocated for each connection.
 #define HTTPD_MAX_HEAD_LEN		1024
 //Max post buffer len. This is dynamically malloc'ed if needed.
@@ -48,8 +50,8 @@ struct HttpdConnData {
 	cgiRecvHandler recvHdl;	// Handler for data received after headers, if any
 	HttpdPostData *post;	// POST data structure
 	int remote_port;		// Remote TCP port
-	uint8 remote_ip[4];		// IP address of client
-	uint8 slot;				// Slot ID
+	uint8_t remote_ip[4];	// IP address of client
+	uint8_t slot;			// Slot ID
 };
 
 //A struct describing the POST data sent inside the http connection.  This is used by the CGI functions
