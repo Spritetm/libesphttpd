@@ -3,7 +3,7 @@
 
 #define HTTPDVER "0.4"
 
-#include <libesphttpd/platform.h>
+#include <libesphttpd/esp8266.h>
 
 //Max length of request head. This is statically allocated for each connection.
 #define HTTPD_MAX_HEAD_LEN		1024
