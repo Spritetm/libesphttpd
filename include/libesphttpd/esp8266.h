@@ -2,11 +2,15 @@
 // Actually misnamed, as it also works for ESP32.
 // ToDo: Figure out better name
 
-
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef ESPOPENRTOS
+#define FREERTOS
+#include <esp8266.h>
+#endif
 
 #ifdef FREERTOS
 #include <stdint.h>
@@ -29,6 +33,8 @@
 #include <upgrade.h>
 #endif
 
-#include "platform.h"
-#include "espmissingincludes.h"
+#include <libesphttpd/platform.h>
 
+#ifndef ESPOPENRTOS
+#include "espmissingincludes.h"
+#endif

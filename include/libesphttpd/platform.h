@@ -1,10 +1,19 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
+#ifdef ESPOPENRTOS
+#define FREERTOS
+#endif
+
 #ifdef FREERTOS
 //#include "esp_timer.h"
 typedef struct RtosConnType RtosConnType;
 typedef RtosConnType* ConnTypePtr;
+#if defined(ESPOPENRTOS)
+#define ICACHE_FLASH_ATTR
+#define ICACHE_RODATA_ATTR
+#define httpd_printf(fmt, ...) printf(fmt, ##__VA_ARGS__)
+#else
 #if 0
 //Unfortunately, this does not always work... the latest esp32 sdk, for example, breaks this.
 #define httpd_printf(fmt, ...) do {	\
@@ -13,6 +22,7 @@ typedef RtosConnType* ConnTypePtr;
 	} while(0)
 #else
 #define httpd_printf(fmt, ...) os_printf(fmt, ##__VA_ARGS__)
+#endif
 #endif
 #else
 #define printf(...) os_printf(__VA_ARGS__)
