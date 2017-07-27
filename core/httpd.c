@@ -588,6 +588,15 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 	} else if (strncmp(h, "POST ", 5)==0) {
 		conn->requestType = HTTPD_METHOD_POST;
 		firstLine=1;
+    } else if (strncmp(h, "PUT ", 4)==0) {
+        conn->requestType = HTTPD_METHOD_PUT;
+        firstLine=1;
+    } else if (strncmp(h, "PATCH ", 6)==0) {
+        conn->requestType = HTTPD_METHOD_PATCH;
+        firstLine=1;
+    } else if (strncmp(h, "DELETE ", 7)==0) {
+        conn->requestType = HTTPD_METHOD_DELETE;
+        firstLine=1;
 	}
 
 	if (firstLine) {

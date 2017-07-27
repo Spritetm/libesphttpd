@@ -60,12 +60,12 @@ static void ICACHE_FLASH_ATTR platConnCb(void *arg) {
 
 int ICACHE_FLASH_ATTR httpdPlatSendData(ConnTypePtr conn, char *buff, int len) {
 	int r;
-	r=espconn_sent(conn, (uint8_t*)buff, len);
-	return (r>=0);
+    r=espconn_sent(conn, (uint8_t*)buff, len);
+    return (r>=0);
 }
 
 void ICACHE_FLASH_ATTR httpdPlatDisconnect(ConnTypePtr conn) {
-	espconn_disconnect(conn);
+    espconn_disconnect(conn);
 }
 
 void ICACHE_FLASH_ATTR httpdPlatDisableTimeout(ConnTypePtr conn) {
@@ -80,8 +80,9 @@ void ICACHE_FLASH_ATTR httpdPlatInit(int port, int maxConnCt) {
 	httpdTcp.local_port=port;
 	httpdConn.proto.tcp=&httpdTcp;
 	espconn_regist_connectcb(&httpdConn, platConnCb);
-	espconn_accept(&httpdConn);
-	espconn_tcp_set_max_con_allow(&httpdConn, maxConnCt);
+    espconn_accept(&httpdConn);
+    espconn_tcp_set_max_con_allow(&httpdConn, maxConnCt);
+    
 }
 
 

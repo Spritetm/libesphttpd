@@ -25,7 +25,7 @@ Some flash handling cgi routines. Used for updating the ESPFS/OTA image.
 #include "espfs.h"
 
 #ifndef UPGRADE_FLAG_FINISH
-#define UPGRADE_FLAG_FINISH     0x02
+#define UPGRADE_FLAG_FINISH  0x02
 #endif
 
 // Check that the header of the firmware blob looks like actual firmware...
@@ -175,7 +175,10 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 				if (connData->post->len > def->fwSize) {
 					state->err="Firmware image too large";
 					state->state=FLST_ERROR;
-				} else {
+                } else if (system_upgrade_userbin_check() == 0) {
+                    state->err="Can't overwrite running image";
+                    state->state=FLST_ERROR;
+                } else {
 					state->len=connData->post->len;
 					state->address=def->fw1Pos;
 					state->state=FLST_WRITE;
