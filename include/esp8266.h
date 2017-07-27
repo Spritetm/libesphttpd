@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <user_interface.h>
 
 #ifdef FREERTOS
 #include <stdint.h>
@@ -25,7 +26,6 @@
 #include <gpio.h>
 #include <mem.h>
 #include <osapi.h>
-#include <user_interface.h>
 #include <upgrade.h>
 #endif
 
