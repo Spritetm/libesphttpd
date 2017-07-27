@@ -180,6 +180,8 @@ checkdirs: $(BUILD_DIR)
 $(BUILD_DIR):
 	$(Q) mkdir -p $@
 
+#ignore vim swap files
+FIND_OPTIONS = -not -iname '*.swp'
 
 webpages.espfs: $(HTMLDIR) espfs/mkespfsimage/mkespfsimage
 ifeq ("$(COMPRESS_W_YUI)","yes")
@@ -191,9 +193,9 @@ ifeq ("$(COMPRESS_W_YUI)","yes")
 	$(Q) awk "BEGIN {printf \"YUI compression ratio was: %.2f%%\\n\", (`du -b -s html_compressed/ | sed 's/\([0-9]*\).*/\1/'`/`du -b -s ../html/ | sed 's/\([0-9]*\).*/\1/'`)*100}"
 # mkespfsimage will compress html, css, svg and js files with gzip by default if enabled
 # override with -g cmdline parameter
-	$(Q) cd html_compressed; find . | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..;
+	$(Q) cd html_compressed; find . $(FIND_OPTIONS) | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..;
 else
-	$(Q) cd ../html; find . | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..
+	$(Q) cd ../html; find . $(FIND_OPTIONS) | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..
 endif
 
 libwebpages-espfs.a: webpages.espfs

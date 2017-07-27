@@ -183,6 +183,7 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 #endif
 			} else {
 				httpd_printf("Invalid compression: %d\n", h.compression);
+				free(r);
 				return NULL;
 			}
 			return r;
