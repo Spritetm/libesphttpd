@@ -13,8 +13,6 @@ COMPONENT_ADD_LDFLAGS := -lwebpages-espfs -llibesphttpd
 
 COMPONENT_EXTRA_CLEAN := mkespfsimage/*
 
-include $(IDF_PATH)/make/component_common.mk
-
 HTMLDIR := $(subst ",,$(CONFIG_ESPHTTPD_HTMLDIR))
 
 CFLAGS += -DFREERTOS
