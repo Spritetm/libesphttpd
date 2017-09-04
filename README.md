@@ -1,6 +1,6 @@
 # Libesphttpd intro
 
-Libesphttpd is a HTTP server library for the ESP8266. It supports integration in projects
+Libesphttpd is a HTTP server library for the ESP8266/ESP32. It supports integration in projects
 running under the non-os and FreeRTOS-based SDK. Its core is clean and small, but it provides an
 extensible architecture with plugins to handle a flash-based compressed read-only filesystem
 for static files, a tiny template engine, websockets, a captive portal, and more.
@@ -9,15 +9,15 @@ for static files, a tiny template engine, websockets, a captive portal, and more
 
 There are two example projects that integrate this code, both a [non-os](http://git.spritesserver.nl/esphttpd.git/)
 as well as a [FreeRTOS-based](http://git.spritesserver.nl/esphttpd-freertos.git/) example. They show
-how to use libesphttpd to serve files from an ESP8266 and illustrate a way to make an user associate
-the ESP8266 with an access point from a standard webbrowser on a PC or mobile phone.
+how to use libesphttpd to serve files from an ESP8266/ESP32 and illustrate a way to make an user associate
+the ESP8266/ESP32 with an access point from a standard webbrowser on a PC or mobile phone.
 
 # Programming guide
 
 Programming libesphttpd will require some knowledge of HTTP. Knowledge of the exact RFCs isn't needed,
 but it helps if you know the difference between a GET and a POST request, how HTTP headers work,
 what an mime-type is and so on. Furthermore, libesphttpd is written in the C language and uses the
-libraries available on the ESP8266 SDK. It is assumed the developer knows C and has some experience 
+libraries available on the ESP8266/ESP32 SDK. It is assumed the developer knows C and has some experience 
 with the SDK.
 
 ## Initializing libesphttpd
@@ -82,13 +82,13 @@ to the host instead. If the hostname does match, it will pass on the request.
 
 * __cgiRedirectApClientToHostname__ (arg: hostname to redirect to)
 This does the same as `cgiRedirectToHostname` but only to clients connected to the SoftAP of the
-ESP8266. This and the former function are used with the captive portal mode. The captive portal consists
+ESP8266/ESP32. This and the former function are used with the captive portal mode. The captive portal consists
 of a DNS-server (started by calling `captdnsInit()`) resolving all hostnames into the IP of the
-ESP8266. These redirect functions can then be used to further redirect the client to the hostname of 
-the ESP8266.
+ESP8266/ESP32. These redirect functions can then be used to further redirect the client to the hostname of 
+the ESP8266/ESP32.
 
 * __cgiReadFlash__ (arg: none)
-Will serve up the SPI flash of the ESP8266 as a binary file.
+Will serve up the SPI flash of the ESP8266/ESP32 as a binary file.
 
 * __cgiGetFirmwareNext__ (arg: CgiUploadFlashDef flash description data)
 For OTA firmware upgrade: indicates if the user1 or user2 firmware needs to be sent to the ESP to do
@@ -98,7 +98,7 @@ an OTA upgrade
 Accepts a POST request containing the user1 or user2 firmware binary and flashes it to the SPI flash
 
 * __cgiRebootFirmware__ (arg: none)
-Reboots the ESP8266 to the newly uploaded code after a firmware upload.
+Reboots the ESP8266/ESP32 to the newly uploaded code after a firmware upload.
 
 * __cgiWiFi* functions__ (arg: various)
 These are used to change WiFi mode, scan for access points, associate to an access point etcetera. See
@@ -313,13 +313,13 @@ int ICACHE_FLASH_ATTR tplShowName(HttpdConnData *connData, char *token, void **a
 	if (token==NULL) return HTTPD_CGI_DONE;
 
 	if (os_strcmp(token, "username")==0) httpdSend(connData, "John Doe", -1);
-	if (os_strcmp(token, "thing")==0) httpdSend(connData, "ESP8266 webserver", -1);
+	if (os_strcmp(token, "thing")==0) httpdSend(connData, "ESP8266/ESP32 webserver", -1);
 
 	return HTTPD_CGI_DONE;
 }
 ```
 
-This will result in a page stating *Welcome, John Doe, to the ESP8266 webserver!*.
+This will result in a page stating *Welcome, John Doe, to the ESP8266/ESP32 webserver!*.
 
 
 ## Websocket functionality
