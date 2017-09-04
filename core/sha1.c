@@ -3,11 +3,11 @@
  */
 // gcc -Wall -DSHA1TEST -o sha1test sha1.c && ./sha1test
 
-#include <esp8266.h>
+#include <libesphttpd/esp8266.h>
 #include <stdint.h>
 #include <string.h>
 
-#include "sha1.h"
+#include "libesphttpd/sha1.h"
 
 //according to http://ip.cadence.com/uploads/pdf/xtensalx_overview_handbook.pdf
 // the cpu is normally defined as little ending, but can be big endian too.

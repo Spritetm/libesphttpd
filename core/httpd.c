@@ -12,8 +12,8 @@ Esp8266 http server - core routines
  */
 
 
-#include <esp8266.h>
-#include "httpd.h"
+#include <libesphttpd/esp8266.h>
+#include "libesphttpd/httpd.h"
 #include "httpd-platform.h"
 
 //This gets set at init time.

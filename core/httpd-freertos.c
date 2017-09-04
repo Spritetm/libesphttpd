@@ -7,9 +7,9 @@ Thanks to my collague at Espressif for writing the foundations of this code.
 #ifdef FREERTOS
 
 
-#include <esp8266.h>
-#include "httpd.h"
-#include "platform.h"
+#include <libesphttpd/esp8266.h>
+#include "libesphttpd/httpd.h"
+#include "libesphttpd/platform.h"
 #include "httpd-platform.h"
 
 #include "freertos/FreeRTOS.h"

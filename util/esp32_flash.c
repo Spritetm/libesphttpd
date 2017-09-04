@@ -3,7 +3,7 @@ Routines for handling the (slightly more complicated) esp32 flash.
 Broken out because esp-idf is expected to get better routines for this.
 */
 
-#include <esp8266.h>
+#include <libesphttpd/esp8266.h>
 #ifdef ESP32
 #include <stdint.h>
 #include <stdio.h>

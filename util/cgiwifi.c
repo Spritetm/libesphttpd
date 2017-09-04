@@ -12,8 +12,8 @@ Cgi/template routines for the /wifi url.
  */
 
 
-#include <esp8266.h>
-#include "cgiwifi.h"
+#include <libesphttpd/esp8266.h>
+#include "libesphttpd/cgiwifi.h"
 
 //Enable this to disallow any changes in AP settings
 //#define DEMO_MODE

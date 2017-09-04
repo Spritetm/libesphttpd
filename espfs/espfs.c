@@ -20,7 +20,7 @@ It's written for use with httpd, but doesn't need to be used as such.
 
 #if __ets__ || ESP_PLATFORM
 //esp build
-#include <esp8266.h>
+#include <libesphttpd/esp8266.h>
 #else
 //Test build
 #include <stdio.h>
@@ -31,7 +31,7 @@ It's written for use with httpd, but doesn't need to be used as such.
 #endif
 
 #include "espfsformat.h"
-#include "espfs.h"
+#include "libesphttpd/espfs.h"
 
 #ifdef ESPFS_HEATSHRINK
 #include "heatshrink_config_custom.h"

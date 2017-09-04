@@ -1,4 +1,4 @@
-#include "espfs.h"
+#include "libesphttpd/espfs.h"
 #ifdef ESPFS_HEATSHRINK
 //Stupid wrapper so we don't have to move c-files around
 //Also loads httpd-specific config.
@@ -6,7 +6,7 @@
 #ifdef __ets__
 //esp build
 
-#include <esp8266.h>
+#include <libesphttpd/esp8266.h>
 
 #endif
 

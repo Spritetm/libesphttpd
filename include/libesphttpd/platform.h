@@ -2,7 +2,7 @@
 #define PLATFORM_H
 
 #ifdef FREERTOS
-#include <esp8266.h>
+#include <libesphttpd/esp8266.h>
 
 #ifdef ESP32
 #include "freertos/FreeRTOS.h"

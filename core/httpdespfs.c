@@ -11,9 +11,9 @@ Connector to let httpd use the espfs filesystem to serve the files in it.
  * ----------------------------------------------------------------------------
  */
 
-#include <esp8266.h>
-#include "httpdespfs.h"
-#include "espfs.h"
+#include <libesphttpd/esp8266.h>
+#include "libesphttpd/httpdespfs.h"
+#include "libesphttpd/espfs.h"
 #include "espfsformat.h"
 
 // The static files marked with FLAG_GZIP are compressed and will be served with GZIP compression.

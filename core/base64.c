@@ -1,6 +1,6 @@
 /* base64.c : base-64 / MIME encode/decode */
 /* PUBLIC DOMAIN - Jon Mayo - November 13, 2003 */
-#include <esp8266.h>
+#include <libesphttpd/esp8266.h>
 #include "base64.h"
 
 static const int base64dec_tab[256] ICACHE_RODATA_ATTR={

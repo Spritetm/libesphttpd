@@ -11,15 +11,15 @@ Some flash handling cgi routines. Used for updating the ESPFS/OTA image.
  * ----------------------------------------------------------------------------
  */
 
-#include <esp8266.h>
-#include "cgiflash.h"
-#include "espfs.h"
-#include "cgiflash.h"
-#include "espfs.h"
+#include <libesphttpd/esp8266.h>
+#include "libesphttpd/cgiflash.h"
+#include "libesphttpd/espfs.h"
+#include "libesphttpd/cgiflash.h"
+#include "libesphttpd/espfs.h"
 
 //#include <osapi.h>
-#include "cgiflash.h"
-#include "espfs.h"
+#include "libesphttpd/cgiflash.h"
+#include "libesphttpd/espfs.h"
 #include "httpd-platform.h"
 #if ESP32
 #include "esp32_flash.h"
