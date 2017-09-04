@@ -300,11 +300,7 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 			httpdSend(connData, state->err, -1);
 			httpdSend(connData, "\n", -1);
 		} else {
-<<<<<<< HEAD
-			//esp32flashSetOtaAsCurrentImage();
-=======
 			esp32flashSetOtaAsCurrentImage();
->>>>>>> c08b304e8b907287af7580510db4c6323eeb052c
 		}
 		free(state);
 		return HTTPD_CGI_DONE;
