@@ -135,8 +135,9 @@ EspFsFile ICACHE_FLASH_ATTR *espFsOpen(char *fileName) {
 	char namebuf[256];
 	EspFsHeader h;
 	EspFsFile *r;
-	//Strip initial slashes
-	while(fileName[0]=='/') fileName++;
+	//Strip first initial slash
+	//We should not strip any next slashes otherwise there is potential security risk when mapped authentication handler will not invoke (ex. ///security.html)
+	if(fileName[0]=='/') fileName++;
 	//Go find that file!
 	while(1) {
 		hpos=p;
