@@ -194,7 +194,7 @@ int ICACHE_FLASH_ATTR httpdGetHeader(HttpdConnData *conn, char *header, char *re
 	while (p<(conn->priv->head+conn->priv->headPos)) {
 		while(*p<=32 && *p!=0) p++; //skip crap at start
 		//See if this is the header
-		if (strncmp(p, header, strlen(header))==0 && p[strlen(header)]==':') {
+		if (strncasecmp(p, header, strlen(header))==0 && p[strlen(header)]==':') {
 			//Skip 'key:' bit of header line
 			p=p+strlen(header)+1;
 			//Skip past spaces after the colon
@@ -311,7 +311,7 @@ int ICACHE_FLASH_ATTR cgiRedirectToHostname(HttpdConnData *connData) {
 	}
 	if (isIP) return HTTPD_CGI_NOTFOUND;
 	//Check hostname; pass on if the same
-	if (strcmp(connData->hostName, (char*)connData->cgiArg)==0) return HTTPD_CGI_NOTFOUND;
+	if (strcasecmp(connData->hostName, (char*)connData->cgiArg)==0) return HTTPD_CGI_NOTFOUND;
 	//Not the same. Redirect to real hostname.
 	buff=malloc(strlen((char*)connData->cgiArg)+sizeof(hostFmt));
 	if (buff==NULL) {
@@ -581,7 +581,7 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 	if (strncmp(h, "GET ", 4)==0) {
 		conn->requestType = HTTPD_METHOD_GET;
 		firstLine=1;
-	} else if (strncmp(h, "Host:", 5)==0) {
+	} else if (strncasecmp(h, "Host:", 5)==0) {
 		i=5;
 		while (h[i]==' ') i++;
 		conn->hostName=&h[i];
@@ -617,12 +617,12 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 		} else {
 			conn->getArgs=NULL;
 		}
-	} else if (strncmp(h, "Connection:", 11)==0) {
+	} else if (strncasecmp(h, "Connection:", 11)==0) {
 		i=11;
 		//Skip trailing spaces
 		while (h[i]==' ') i++;
 		if (strncmp(&h[i], "close", 5)==0) conn->priv->flags&=~HFL_CHUNKED; //Don't use chunked conn
-	} else if (strncmp(h, "Content-Length:", 15)==0) {
+	} else if (strncasecmp(h, "Content-Length:", 15)==0) {
 		i=15;
 		//Skip trailing spaces
 		while (h[i]==' ') i++;
@@ -643,7 +643,7 @@ static void ICACHE_FLASH_ATTR httpdParseHeader(char *h, HttpdConnData *conn) {
 			return;
 		}
 		conn->post->buffLen=0;
-	} else if (strncmp(h, "Content-Type: ", 14)==0) {
+	} else if (strncasecmp(h, "Content-Type: ", 14)==0) {
 		if (strstr(h, "multipart/form-data")) {
 			// It's multipart form data so let's pull out the boundary for future use
 			char *b;
