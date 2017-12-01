@@ -13,6 +13,7 @@ USE_HEATSHRINK ?= yes
 HTTPD_WEBSOCKETS ?= yes
 USE_OPENSDK ?= no
 HTTPD_MAX_CONNECTIONS ?= 4
+HTMLDIR ?= ../html
 #For FreeRTOS
 HTTPD_STACKSIZE ?= 2048
 #Auto-detect ESP32 build if not given.
@@ -186,16 +187,16 @@ FIND_OPTIONS = -not -iname '*.swp'
 webpages.espfs: $(HTMLDIR) espfs/mkespfsimage/mkespfsimage
 ifeq ("$(COMPRESS_W_YUI)","yes")
 	$(Q) rm -rf html_compressed;
-	$(Q) cp -r ../html html_compressed;
+	$(Q) cp -r $(HTMLDIR) html_compressed;
 	$(Q) echo "Compression assets with yui-compressor. This may take a while..."
 	$(Q) for file in `find html_compressed -type f -name "*.js"`; do $(YUI-COMPRESSOR) --type js $$file -o $$file; done
 	$(Q) for file in `find html_compressed -type f -name "*.css"`; do $(YUI-COMPRESSOR) --type css $$file -o $$file; done
-	$(Q) awk "BEGIN {printf \"YUI compression ratio was: %.2f%%\\n\", (`du -b -s html_compressed/ | sed 's/\([0-9]*\).*/\1/'`/`du -b -s ../html/ | sed 's/\([0-9]*\).*/\1/'`)*100}"
+	$(Q) awk "BEGIN {printf \"YUI compression ratio was: %.2f%%\\n\", (`du -b -s html_compressed/ | sed 's/\([0-9]*\).*/\1/'`/`du -b -s $(HTMLDIR) | sed 's/\([0-9]*\).*/\1/'`)*100}"
 # mkespfsimage will compress html, css, svg and js files with gzip by default if enabled
 # override with -g cmdline parameter
 	$(Q) cd html_compressed; find . $(FIND_OPTIONS) | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..;
 else
-	$(Q) cd ../html; find . $(FIND_OPTIONS) | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..
+	$(Q) cd $(HTMLDIR); find . $(FIND_OPTIONS) | $(THISDIR)/espfs/mkespfsimage/mkespfsimage > $(THISDIR)/webpages.espfs; cd ..
 endif
 
 libwebpages-espfs.a: webpages.espfs
