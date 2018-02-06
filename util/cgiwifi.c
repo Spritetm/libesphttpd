@@ -174,6 +174,12 @@ ApData ICACHE_FLASH_ATTR *cgiWiFiScanResult(int n) {
     return cgiWifiAps.apData[n];
 }
 
+//Routine to return the scan result count.
+int cgiWifiScanResultCount(void)
+{
+    return cgiWifiAps.scanInProgress ? -1 : cgiWifiAps.noAps;
+}
+    
 //This CGI is called from the bit of AJAX-code in wifi.html. It will initiate a
 //scan for access points and if available will return the result of an earlier scan.
 //The result is embedded in a bit of JSON parsed by the javascript in wifi.html.

@@ -24,5 +24,6 @@ int wifiJoin(char *ssid, char *passwd);
 int cgiWiFiStartScan(void (*callback)(void *data, int count), void *data);
 int cgiWiFiScanDone(void);
 ApData *cgiWiFiScanResult(int n);
+int cgiWifiScanResultCount(void);
 
 #endif
