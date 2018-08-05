@@ -9,7 +9,7 @@ for static files, a tiny template engine, websockets, a captive portal, and more
 
 There are two example projects that integrate this code, both a [non-os](http://git.spritesserver.nl/esphttpd.git/)
 as well as a [FreeRTOS-based](http://git.spritesserver.nl/esphttpd-freertos.git/) example. They show
-how to use libesphttpd to serve files from an ESP8266 and illustrate a way to make an user associate
+how to use libesphttpd to serve files from an ESP8266 and illustrate a way to make a user associate
 the ESP8266 with an access point from a standard webbrowser on a PC or mobile phone.
 
 # Programming guide
@@ -183,7 +183,7 @@ int ICACHE_FLASH_ATTR cgiGreetUser(HttpdConnData *connData) {
 ```
 
 Putting this CGI function into the HttpdBuiltInUrl array, for example with pattern `"/hello.cgi"`,
-would allow an user to request the page `"http://192.168.4.1/hello.cgi?name=John+Doe"` and get a document
+would allow a user to request the page `"http://192.168.4.1/hello.cgi?name=John+Doe"` and get a document
 saying *"Hello, John Doe!"*.
 
 A word of warning: while it may look like you could forego the entire 
