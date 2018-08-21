@@ -30,11 +30,10 @@ Some flash handling cgi routines. Used for updating the ESPFS/OTA image.
 
 // Check that the header of the firmware blob looks like actual firmware...
 static int ICACHE_FLASH_ATTR checkBinHeader(void *buf) {
-	uint8_t *cd = (uint8_t *)buf;
-	if (cd[0] != 0xEA) return 0;
-	if (cd[1] != 4 || cd[2] > 3 || cd[3] > 0x40) return 0;
-	if (((uint16_t *)buf)[3] != 0x4010) return 0;
-	if (((uint32_t *)buf)[2] != 0) return 0;
+	if (*buf != 0xEA) return 0;
+	if (*(buf + 1) != 4 || *(buf + 2) > 3 || *(buf + 3) > 0x60) return 0;
+	if (*(buf + 6) != 0x10 || *(buf + 7) != 0x40) return 0;
+	if (*(buf + 8) != 0 || *(buf + 9) != 0 || *(buf + 10) != 0 || *(buf + 11) != 0) return 0;
 	return 1;
 }
 
