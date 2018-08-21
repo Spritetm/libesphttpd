@@ -742,7 +742,7 @@ void ICACHE_FLASH_ATTR httpdRecvCb(ConnTypePtr rconn, char *remIp, int remPort, 
 			conn->post->buff[conn->post->buffLen++]=data[x];
 			conn->post->received++;
 			conn->hostName=NULL;
-			if (conn->post->buffLen >= conn->post->buffSize || conn->post->received == conn->post->len) {
+			if (conn->post->buffLen >= conn->post->buffSize || (x+1) == len) {
 				//Received a chunk of post data
 				conn->post->buff[conn->post->buffLen]=0; //zero-terminate, in case the cgi handler knows it can use strings
 				//Process the data
